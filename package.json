@@ -1,1 +1,9 @@
+{
+  "name": "Traceur-de-Route",
+  "version": "1.0.0",
+  "dependencies": {
+    "@capacitor/android": "latest",
+    "@capacitor/core": "latest"
+  }
+}
 
