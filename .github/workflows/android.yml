@@ -1,4 +1,4 @@
-name: Build Traceur GPS
+name: Build Traceur-de-Route
 on: [push]
 jobs:
   build:
@@ -46,6 +46,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: traceur-gps-debug
+          name: Traceur-de-Route-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
