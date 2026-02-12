@@ -12,7 +12,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # CORRECTION : On force Node.js v22 pour que Capacitor fonctionne
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -26,6 +25,10 @@ jobs:
 
       - name: Initialize Capacitor Android
         run: |
+          # On initialise le projet proprement s'il ne l'est pas
+          if [ ! -f "capacitor.config.json" ]; then
+            npx cap init "Traceur de Route" com.traceur.gps --web-dir www
+          fi
           npx cap add android || echo "Ok"
           npx cap sync android
 
