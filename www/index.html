@@ -1,1 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Traceur GPS</title>
+    <style>
+        body { 
+            margin: 0; padding: 0; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; height: 100vh; 
+            background-color: #1a1a1a; color: white; font-family: sans-serif; 
+        }
+        #btn-record {
+            width: 150px; height: 150px; border-radius: 50%; border: none;
+            background-color: #e74c3c; color: white; font-weight: bold;
+            font-size: 1.2rem; cursor: pointer; box-shadow: 0 0 20px rgba(231, 76, 60, 0.5);
+            transition: all 0.3s;
+        }
+        #btn-record.recording {
+            background-color: #2ecc71; box-shadow: 0 0 20px rgba(46, 204, 113, 0.5);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .info { margin-top: 30px; text-align: center; }
+        #compteur { font-size: 2rem; color: #f1c40f; }
+        #statut { margin-top: 10px; opacity: 0.6; }
+    </style>
+</head>
+<body>
 
+    <button id="btn-record" onclick="toggleRecord()">DÉMARRER</button>
+
+    <div class="info">
+        <div id="compteur">0 points</div>
+        <div id="statut">Prêt à enregistrer</div>
+    </div>
+
+    <script>
+        let isRecording = false;
+        let trajet = [];
+        const btn = document.getElementById('btn-record');
+        const compteurEl = document.getElementById('compteur');
+        const statutEl = document.getElementById('statut');
+
+        function toggleRecord() {
+            isRecording = !isRecording;
+            
+            if (isRecording) {
+                trajet = []; // On vide le trajet précédent
+                btn.innerText = "STOP";
+                btn.classList.add('recording');
+                statutEl.innerText = "Enregistrement en cours...";
+                startTracking();
+            } else {
+                btn.innerText = "DÉMARRER";
+                btn.classList.remove('recording');
+                statutEl.innerText = "Trajet sauvegardé (" + trajet.length + " points)";
+                console.log("Données du trajet :", JSON.stringify(trajet));
+                // Ici, on pourra plus tard envoyer le trajet vers un fichier ou une carte
+            }
+        }
+
+        function startTracking() {
+            if (!isRecording) return;
+
+            navigator.geolocation.getCurrentPosition((pos) => {
+                if (isRecording) {
+                    const point = {
+                        lat: pos.coords.latitude,
+                        lon: pos.coords.longitude,
+                        time: new Date().toISOString()
+                    };
+                    trajet.push(point);
+                    compteurEl.innerText = trajet.length + " points";
+                    
+                    // On recommence toutes les 5 secondes
+                    setTimeout(startTracking, 5000);
+                }
+            }, (err) => {
+                statutEl.innerText = "Erreur GPS : " + err.message;
+            }, { enableHighAccuracy: true });
+        }
+    </script>
+</body>
+</html>
