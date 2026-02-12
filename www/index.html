@@ -12,27 +12,38 @@
             margin: 0; padding: 0; display: flex; flex-direction: column; 
             height: 100vh; background-color: #1a1a1a; color: white; font-family: sans-serif; 
         }
-        #map { flex: 1; width: 100%; background: #222; } /* La carte prend tout l'espace du haut */
+        /* La carte prend tout le haut de l'écran */
+        #map { flex: 1; width: 100%; background: #222; } 
         
+        /* La zone de contrôle en bas */
         .controls { 
             padding: 20px; display: flex; flex-direction: column; 
             align-items: center; background: #1a1a1a; border-top: 2px solid #333;
         }
+        
+        /* LE BOUTON DONT TU PARLES */
         #btn-record {
-            width: 80px; height: 80px; border-radius: 50%; border: none;
+            width: 100px; height: 100px; border-radius: 50%; border: none;
             background-color: #e74c3c; color: white; font-weight: bold;
-            cursor: pointer; box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
-            margin-bottom: 10px;
+            font-size: 1.1rem; cursor: pointer; 
+            box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
+            margin-bottom: 15px; transition: all 0.3s ease;
         }
+        
+        /* Quand on enregistre, il devient vert et pulse */
         #btn-record.recording {
-            background-color: #2ecc71; animation: pulse 1.5s infinite;
+            background-color: #2ecc71; 
+            box-shadow: 0 0 20px rgba(46, 204, 113, 0.6);
+            animation: pulse 1.5s infinite;
         }
+        
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
-        .stats { font-size: 0.9rem; color: #f1c40f; text-align: center; }
+
+        .stats { font-size: 1rem; color: #f1c40f; text-align: center; }
     </style>
 </head>
 <body>
@@ -42,8 +53,8 @@
     <div class="controls">
         <button id="btn-record" onclick="toggleRecord()">START</button>
         <div class="stats">
-            <span id="compteur">0 points</span> | <span id="distance">0 km</span>
-            <div id="statut" style="opacity: 0.5; font-size: 0.7rem; margin-top: 5px;">Prêt</div>
+            <span id="compteur">0 points</span>
+            <div id="statut" style="opacity: 0.5; font-size: 0.8rem; margin-top: 5px;">Prêt à tracer</div>
         </div>
     </div>
 
@@ -55,13 +66,11 @@
         const compteurEl = document.getElementById('compteur');
         const statutEl = document.getElementById('statut');
 
-        // Initialisation de la carte
         function initMap() {
-            map = L.map('map').setView([50.66, 4.20], 13); // Centré sur Tubize par défaut
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap'
-            }).addTo(map);
-            polyline = L.polyline([], {color: '#3498db', weight: 5}).addTo(map);
+            // On centre la carte sur Tubize au départ
+            map = L.map('map').setView([50.66, 4.20], 15); 
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            polyline = L.polyline([], {color: '#3498db', weight: 6}).addTo(map);
         }
 
         function toggleRecord() {
@@ -69,16 +78,15 @@
             
             if (isRecording) {
                 trajet = [];
-                polyline.setLatLngs([]); // On efface l'ancien tracé
+                polyline.setLatLngs([]); 
                 btn.innerText = "STOP";
                 btn.classList.add('recording');
-                statutEl.innerText = "Enregistrement...";
+                statutEl.innerText = "Enregistrement en cours...";
                 startTracking();
             } else {
                 btn.innerText = "START";
                 btn.classList.remove('recording');
-                statutEl.innerText = "Trajet terminé et sauvegardé !";
-                // On ajuste la carte pour voir tout le trajet
+                statutEl.innerText = "Trajet sauvegardé !";
                 if (trajet.length > 0) map.fitBounds(polyline.getBounds());
             }
         }
@@ -90,16 +98,13 @@
                 if (isRecording) {
                     const latlng = [pos.coords.latitude, pos.coords.longitude];
                     trajet.push(latlng);
-                    
-                    // Mise à jour de la ligne sur la carte
                     polyline.addLatLng(latlng);
                     map.panTo(latlng);
-                    
-                    compteurEl.innerText = trajet.length + " points";
-                    setTimeout(startTracking, 5000); // Enregistre toutes les 5 secondes
+                    compteurEl.innerText = trajet.length + " points enregistrés";
+                    setTimeout(startTracking, 5000); // On prend un point toutes les 5 sec
                 }
             }, (err) => {
-                statutEl.innerText = "Erreur GPS";
+                statutEl.innerText = "Erreur GPS : activez la localisation";
             }, { enableHighAccuracy: true });
         }
 
@@ -107,3 +112,4 @@
     </script>
 </body>
 </html>
+
