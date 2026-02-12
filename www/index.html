@@ -3,64 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Traceur GPS</title>
+    <title>Traceur GPS Pro</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <style>
         body { 
             margin: 0; padding: 0; display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; height: 100vh; 
-            background-color: #1a1a1a; color: white; font-family: sans-serif; 
+            height: 100vh; background-color: #1a1a1a; color: white; font-family: sans-serif; 
+        }
+        #map { flex: 1; width: 100%; background: #222; } /* La carte prend tout l'espace du haut */
+        
+        .controls { 
+            padding: 20px; display: flex; flex-direction: column; 
+            align-items: center; background: #1a1a1a; border-top: 2px solid #333;
         }
         #btn-record {
-            width: 150px; height: 150px; border-radius: 50%; border: none;
+            width: 80px; height: 80px; border-radius: 50%; border: none;
             background-color: #e74c3c; color: white; font-weight: bold;
-            font-size: 1.2rem; cursor: pointer; box-shadow: 0 0 20px rgba(231, 76, 60, 0.5);
-            transition: all 0.3s;
+            cursor: pointer; box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
+            margin-bottom: 10px;
         }
         #btn-record.recording {
-            background-color: #2ecc71; box-shadow: 0 0 20px rgba(46, 204, 113, 0.5);
-            animation: pulse 1.5s infinite;
+            background-color: #2ecc71; animation: pulse 1.5s infinite;
         }
         @keyframes pulse {
             0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+            50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
-        .info { margin-top: 30px; text-align: center; }
-        #compteur { font-size: 2rem; color: #f1c40f; }
-        #statut { margin-top: 10px; opacity: 0.6; }
+        .stats { font-size: 0.9rem; color: #f1c40f; text-align: center; }
     </style>
 </head>
 <body>
 
-    <button id="btn-record" onclick="toggleRecord()">DÉMARRER</button>
+    <div id="map"></div>
 
-    <div class="info">
-        <div id="compteur">0 points</div>
-        <div id="statut">Prêt à enregistrer</div>
+    <div class="controls">
+        <button id="btn-record" onclick="toggleRecord()">START</button>
+        <div class="stats">
+            <span id="compteur">0 points</span> | <span id="distance">0 km</span>
+            <div id="statut" style="opacity: 0.5; font-size: 0.7rem; margin-top: 5px;">Prêt</div>
+        </div>
     </div>
 
     <script>
         let isRecording = false;
         let trajet = [];
+        let map, polyline;
         const btn = document.getElementById('btn-record');
         const compteurEl = document.getElementById('compteur');
         const statutEl = document.getElementById('statut');
+
+        // Initialisation de la carte
+        function initMap() {
+            map = L.map('map').setView([50.66, 4.20], 13); // Centré sur Tubize par défaut
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            polyline = L.polyline([], {color: '#3498db', weight: 5}).addTo(map);
+        }
 
         function toggleRecord() {
             isRecording = !isRecording;
             
             if (isRecording) {
-                trajet = []; // On vide le trajet précédent
+                trajet = [];
+                polyline.setLatLngs([]); // On efface l'ancien tracé
                 btn.innerText = "STOP";
                 btn.classList.add('recording');
-                statutEl.innerText = "Enregistrement en cours...";
+                statutEl.innerText = "Enregistrement...";
                 startTracking();
             } else {
-                btn.innerText = "DÉMARRER";
+                btn.innerText = "START";
                 btn.classList.remove('recording');
-                statutEl.innerText = "Trajet sauvegardé (" + trajet.length + " points)";
-                console.log("Données du trajet :", JSON.stringify(trajet));
-                // Ici, on pourra plus tard envoyer le trajet vers un fichier ou une carte
+                statutEl.innerText = "Trajet terminé et sauvegardé !";
+                // On ajuste la carte pour voir tout le trajet
+                if (trajet.length > 0) map.fitBounds(polyline.getBounds());
             }
         }
 
@@ -69,21 +88,22 @@
 
             navigator.geolocation.getCurrentPosition((pos) => {
                 if (isRecording) {
-                    const point = {
-                        lat: pos.coords.latitude,
-                        lon: pos.coords.longitude,
-                        time: new Date().toISOString()
-                    };
-                    trajet.push(point);
-                    compteurEl.innerText = trajet.length + " points";
+                    const latlng = [pos.coords.latitude, pos.coords.longitude];
+                    trajet.push(latlng);
                     
-                    // On recommence toutes les 5 secondes
-                    setTimeout(startTracking, 5000);
+                    // Mise à jour de la ligne sur la carte
+                    polyline.addLatLng(latlng);
+                    map.panTo(latlng);
+                    
+                    compteurEl.innerText = trajet.length + " points";
+                    setTimeout(startTracking, 5000); // Enregistre toutes les 5 secondes
                 }
             }, (err) => {
-                statutEl.innerText = "Erreur GPS : " + err.message;
+                statutEl.innerText = "Erreur GPS";
             }, { enableHighAccuracy: true });
         }
+
+        window.onload = initMap;
     </script>
 </body>
 </html>
