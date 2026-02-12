@@ -6,10 +6,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: set up JDK 17
+      # Correction : Passage à Java 21 pour supporter Capacitor 8
+      - name: set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
 
       - name: Set up Node.js
@@ -25,9 +26,10 @@ jobs:
 
       - name: Initialize Capacitor Config
         run: |
-          # On crée un fichier de config minimal pour que Capacitor ne râle pas
-          echo '{"appId": "com.traceur.gps", "appName": "Traceur de Route", "webDir": "www"}' > capacitor.config.json
-          # On crée le dossier www s'il n'existe pas
+          # Création du fichier de config s'il n'existe pas
+          if [ ! -f "capacitor.config.json" ]; then
+            echo '{"appId": "com.traceur.gps", "appName": "Traceur de Route", "webDir": "www"}' > capacitor.config.json
+          fi
           mkdir -p www
 
       - name: Initialize Capacitor Android
@@ -42,11 +44,13 @@ jobs:
             npx @capacitor/assets generate --android
             find android/app/src/main/res/ -name "ic_launcher.png" -exec cp icon.png {} \;
             find android/app/src/main/res/ -name "ic_launcher_round.png" -exec cp icon.png {} \;
+            find android/app/src/main/res/ -name "ic_launcher_foreground.png" -exec cp icon.png {} \;
           fi
 
       - name: Permissions GPS
         run: |
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="true" />' android/app/src/main/AndroidManifest.xml
+          # Correction des permissions en évitant les doublons
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="true" />' android/app/src/main/AndroidManifest.xml
 
       - name: Build APK
         run: |
