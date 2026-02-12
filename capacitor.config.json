@@ -1,0 +1,7 @@
+{
+  "appId": "com.traceur.gps",
+  "appName": "Traceur de Route",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
+
