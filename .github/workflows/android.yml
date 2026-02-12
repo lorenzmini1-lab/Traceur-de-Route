@@ -1,4 +1,4 @@
-name: Build Traceur-de-Route
+name: Build Traceur GPS
 on: [push]
 jobs:
   build:
@@ -14,27 +14,32 @@ jobs:
           
       - name: Install Dependencies
         run: |
+          # Installation des outils de base et de Capacitor
           npm install
+          npm install @capacitor/cli @capacitor/core @capacitor/android
           npm install @capacitor/assets -g
 
       - name: Initialize Capacitor Android
         run: |
+          # Création et synchronisation du projet Android
           npx cap add android || echo "Ok"
           npx cap sync android
 
       - name: Generate Icon (L'épingle)
         run: |
-          # Assure-toi d'avoir mis l'image icon.png à la racine
+          # Transformation de ton image d'épingle en icône
           if [ -f "icon.png" ]; then
             cp icon.png splash.png
             npx @capacitor/assets generate --android
-            # Force l'écrasement pour éviter les anciens logos
+            # Force l'écrasement des logos par défaut
             find android/app/src/main/res/ -name "ic_launcher.png" -exec cp icon.png {} \;
             find android/app/src/main/res/ -name "ic_launcher_round.png" -exec cp icon.png {} \;
+            find android/app/src/main/res/ -name "ic_launcher_foreground.png" -exec cp icon.png {} \;
           fi
 
       - name: Permissions GPS Haute Précision
         run: |
+          # Injection des permissions pour l'enregistrement de trajet
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="true" />' android/app/src/main/AndroidManifest.xml
 
       - name: Build APK
@@ -46,6 +51,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Traceur-de-Route-debug
+          name: traceur-gps-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
-
