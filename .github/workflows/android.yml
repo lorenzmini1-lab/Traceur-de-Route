@@ -23,26 +23,28 @@ jobs:
           npm install @capacitor/cli @capacitor/core @capacitor/android
           npm install @capacitor/assets -g
 
+      - name: Initialize Capacitor Config
+        run: |
+          # On crée un fichier de config minimal pour que Capacitor ne râle pas
+          echo '{"appId": "com.traceur.gps", "appName": "Traceur de Route", "webDir": "www"}' > capacitor.config.json
+          # On crée le dossier www s'il n'existe pas
+          mkdir -p www
+
       - name: Initialize Capacitor Android
         run: |
-          # On initialise le projet proprement s'il ne l'est pas
-          if [ ! -f "capacitor.config.json" ]; then
-            npx cap init "Traceur de Route" com.traceur.gps --web-dir www
-          fi
           npx cap add android || echo "Ok"
           npx cap sync android
 
-      - name: Generate Icon (L'épingle)
+      - name: Generate Icon
         run: |
           if [ -f "icon.png" ]; then
             cp icon.png splash.png
             npx @capacitor/assets generate --android
             find android/app/src/main/res/ -name "ic_launcher.png" -exec cp icon.png {} \;
             find android/app/src/main/res/ -name "ic_launcher_round.png" -exec cp icon.png {} \;
-            find android/app/src/main/res/ -name "ic_launcher_foreground.png" -exec cp icon.png {} \;
           fi
 
-      - name: Permissions GPS Haute Précision
+      - name: Permissions GPS
         run: |
           sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="true" />' android/app/src/main/AndroidManifest.xml
 
