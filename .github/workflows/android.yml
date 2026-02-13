@@ -32,6 +32,11 @@ jobs:
           npx cap add android || echo "Ok"
           npx cap sync android
 
+      - name: Fix Android Permissions
+        run: |
+          # Cette commande ajoute les droits GPS obligatoires dans le fichier système Android
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="true" />' android/app/src/main/AndroidManifest.xml
+
       - name: Build APK
         run: |
           cd android
