@@ -15,31 +15,41 @@
         #map { flex: 1; width: 100%; background: #222; } 
         
         .controls { 
-            padding: 20px; display: flex; flex-direction: column; 
+            padding: 15px; display: flex; flex-direction: column; 
             align-items: center; background: #1a1a1a; border-top: 2px solid #333;
         }
         
+        .row { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+
         #btn-record {
-            width: 90px; height: 90px; border-radius: 50%; border: none;
+            width: 80px; height: 80px; border-radius: 50%; border: none;
             background-color: #e74c3c; color: white; font-weight: bold;
-            font-size: 1rem; cursor: pointer; 
-            box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
-            margin-bottom: 15px; transition: all 0.3s ease;
+            cursor: pointer; box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
+            margin-bottom: 5px;
         }
         
-        #btn-record.recording {
-            background-color: #2ecc71; 
-            box-shadow: 0 0 20px rgba(46, 204, 113, 0.6);
-            animation: pulse 1.5s infinite;
-        }
+        #btn-record.recording { background-color: #2ecc71; animation: pulse 1.5s infinite; }
         
+        #save-section { display: none; width: 100%; text-align: center; margin-top: 10px; }
+
+        #trajet-name {
+            padding: 10px; border-radius: 5px; border: 1px solid #444;
+            background: #333; color: white; margin-bottom: 10px; width: 80%;
+        }
+
+        #btn-save {
+            padding: 12px 25px; border-radius: 25px; border: none;
+            background-color: #3498db; color: white; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+        }
+
         @keyframes pulse {
             0% { transform: scale(1); }
             50% { transform: scale(1.1); }
             100% { transform: scale(1); }
         }
 
-        .stats { font-size: 1rem; color: #f1c40f; text-align: center; }
+        .stats { font-size: 0.9rem; color: #f1c40f; text-align: center; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -47,7 +57,15 @@
     <div id="map"></div>
 
     <div class="controls">
-        <button id="btn-record" onclick="toggleRecord()">START</button>
+        <div class="row">
+            <button id="btn-record" onclick="toggleRecord()">START</button>
+            
+            <div id="save-section">
+                <input type="text" id="trajet-name" placeholder="Nom du trajet (ex: Maison)">
+                <br>
+                <button id="btn-save" onclick="saveTrace()">SAUVEGARDER LE TRACÉ</button>
+            </div>
+        </div>
         <div class="stats">
             <span id="compteur">0 points</span>
             <div id="statut" style="opacity: 0.5; font-size: 0.8rem; margin-top: 5px;">Prêt à tracer</div>
@@ -58,21 +76,17 @@
         let isRecording = false;
         let trajet = [];
         let map, polyline, userMarker;
-        const btn = document.getElementById('btn-record');
+        const btnRec = document.getElementById('btn-record');
+        const saveSection = document.getElementById('save-section');
+        const trajetNameInput = document.getElementById('trajet-name');
         const compteurEl = document.getElementById('compteur');
         const statutEl = document.getElementById('statut');
 
         function initMap() {
-            // Centre initial (Tubize)
             map = L.map('map').setView([50.66, 4.20], 16); 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            
-            // On crée la ligne bleue
             polyline = L.polyline([], {color: '#3498db', weight: 6}).addTo(map);
-            
-            // On crée le marqueur de l'utilisateur (le point)
             userMarker = L.marker([50.66, 4.20]).addTo(map);
-            userMarker.bindPopup("Tu es ici").openPopup();
         }
 
         function toggleRecord() {
@@ -81,42 +95,61 @@
             if (isRecording) {
                 trajet = [];
                 polyline.setLatLngs([]); 
-                btn.innerText = "STOP";
-                btn.classList.add('recording');
-                statutEl.innerText = "Enregistrement en cours...";
+                btnRec.innerText = "STOP";
+                btnRec.classList.add('recording');
+                saveSection.style.display = "none";
+                statutEl.innerText = "Enregistrement...";
                 startTracking();
             } else {
-                btn.innerText = "START";
-                btn.classList.remove('recording');
-                statutEl.innerText = "Trajet sauvegardé !";
-                if (trajet.length > 0) map.fitBounds(polyline.getBounds());
+                btnRec.innerText = "START";
+                btnRec.classList.remove('recording');
+                statutEl.innerText = "Tracé fini !";
+                if (trajet.length > 1) {
+                    saveSection.style.display = "block";
+                    map.fitBounds(polyline.getBounds());
+                }
             }
         }
 
         function startTracking() {
             if (!isRecording) return;
-
             navigator.geolocation.getCurrentPosition((pos) => {
                 const latlng = [pos.coords.latitude, pos.coords.longitude];
-                
-                // 1. Déplacer le point (le marqueur)
                 userMarker.setLatLng(latlng);
-                
-                // 2. Recentrer la carte sur le point
                 map.panTo(latlng);
 
                 if (isRecording) {
-                    // 3. Ajouter à la ligne et enregistrer
-                    trajet.push(latlng);
+                    trajet.push({
+                        lat: latlng[0], 
+                        lon: latlng[1], 
+                        time: new Date().toLocaleTimeString(),
+                        date: new Date().toLocaleDateString()
+                    });
                     polyline.addLatLng(latlng);
-                    compteurEl.innerText = trajet.length + " points enregistrés";
-                    
-                    // On recommence toutes les 5 secondes
+                    compteurEl.innerText = trajet.length + " points";
                     setTimeout(startTracking, 5000); 
                 }
-            }, (err) => {
-                statutEl.innerText = "Erreur GPS : vérifiez vos réglages";
-            }, { enableHighAccuracy: true });
+            }, null, { enableHighAccuracy: true });
+        }
+
+        function saveTrace() {
+            const name = trajetNameInput.value || "mon_trajet";
+            const dataToSave = {
+                nom: name,
+                date: new Date().toLocaleDateString(),
+                points: trajet
+            };
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataToSave));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", name + "_" + new Date().getTime() + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            
+            alert("Trajet '" + name + "' sauvegardé !");
+            saveSection.style.display = "none";
         }
 
         window.onload = initMap;
