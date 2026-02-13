@@ -29,7 +29,6 @@
         
         #btn-record.recording { background-color: #2ecc71; animation: pulse 1.5s infinite; }
         
-        /* SECTION DE SAUVEGARDE CHOISIE */
         #save-section { 
             display: none; 
             width: 90%; 
@@ -39,15 +38,16 @@
             text-align: center;
         }
 
-        #btn-choose-folder {
+        #btn-share {
             background-color: #f39c12;
             color: white;
             border: none;
-            padding: 12px 20px;
-            border-radius: 5px;
+            padding: 15px 20px;
+            border-radius: 8px;
             font-weight: bold;
             cursor: pointer;
             width: 100%;
+            font-size: 1rem;
         }
 
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
@@ -65,7 +65,7 @@
         
         <div id="save-section">
             <p style="margin:0 0 10px 0; font-size: 0.9rem;">Tracé terminé !</p>
-            <button id="btn-choose-folder" onclick="saveTraceWithChoice()">CHOISIR OÙ ENREGISTRER</button>
+            <button id="btn-share" onclick="shareTrace()">ENREGISTRER OU PARTAGER</button>
         </div>
     </div>
 
@@ -115,7 +115,6 @@
                     trajet.push({
                         lat: latlng[0], 
                         lon: latlng[1], 
-                        vitesse: pos.coords.speed,
                         heure: new Date().toLocaleTimeString()
                     });
                     polyline.addLatLng(latlng);
@@ -125,27 +124,33 @@
             }, null, { enableHighAccuracy: true });
         }
 
-        // LA NOUVELLE FONCTION QUI DEMANDE OÙ ENREGISTRER
-        async function saveTraceWithChoice() {
+        // --- NOUVELLE FONCTION DE PARTAGE / SAUVEGARDE LIBRE ---
+        async function shareTrace() {
             const fileName = "trajet_" + new Date().getTime() + ".json";
             const content = JSON.stringify(trajet, null, 2);
+            
+            // On crée un fichier virtuel
+            const file = new File([content], fileName, { type: 'application/json' });
 
-            try {
-                // Cette fonction ouvre l'explorateur de fichiers du téléphone
+            // On vérifie si ton téléphone supporte le partage de fichiers
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: 'Mon Trajet GPS',
+                        text: 'Voici mon tracé enregistré avec mon application.'
+                    });
+                } catch (err) {
+                    console.log("Partage annulé ou erreur :", err);
+                }
+            } else {
+                // Secours si le partage ne marche pas
+                alert("Le partage n'est pas supporté, essai du téléchargement classique.");
                 const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(content);
-                const downloadAnchorNode = document.createElement('a');
-                downloadAnchorNode.setAttribute("href", dataStr);
-                downloadAnchorNode.setAttribute("download", fileName);
-                document.body.appendChild(downloadAnchorNode);
-                
-                // Sur Android, cela déclenche le gestionnaire de téléchargement 
-                // qui te demande souvent si tu veux modifier le nom ou l'endroit.
-                downloadAnchorNode.click();
-                downloadAnchorNode.remove();
-                
-                alert("Demande d'enregistrement envoyée au système !");
-            } catch (err) {
-                alert("Erreur lors de la sauvegarde : " + err);
+                const a = document.createElement('a');
+                a.href = dataStr;
+                a.download = fileName;
+                a.click();
             }
         }
 
