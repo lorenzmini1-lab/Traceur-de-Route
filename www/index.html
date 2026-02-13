@@ -10,17 +10,17 @@
         body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #1a1a1a; color: white; font-family: sans-serif; }
         #map { height: 70vh; width: 100%; background: #222; } 
         .controls { padding: 15px; display: flex; flex-direction: column; align-items: center; background: #1a1a1a; flex: 1; border-top: 2px solid #333; }
-        #btn-record { width: 70px; height: 70px; border-radius: 50%; border: none; background: #e74c3c; color: white; font-weight: bold; cursor: pointer; }
+        #btn-record { width: 75px; height: 75px; border-radius: 50%; border: none; background: #e74c3c; color: white; font-weight: bold; cursor: pointer; z-index: 1000; }
         #btn-record.recording { background: #2ecc71; }
-        #save-section { display: none; margin-top: 10px; width: 100%; text-align: center; }
-        #btn-save { background: #3498db; color: white; border: none; padding: 12px; border-radius: 5px; width: 90%; font-weight: bold; }
-        .status { color: #f1c40f; margin-bottom: 5px; font-size: 0.8rem; }
+        #save-section { display: none; margin-top: 15px; width: 100%; text-align: center; }
+        #btn-save { background: #3498db; color: white; border: none; padding: 15px; border-radius: 8px; width: 90%; font-weight: bold; font-size: 1rem; }
+        .status { color: #f1c40f; margin-bottom: 8px; font-size: 0.9rem; min-height: 1.2em; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <div class="controls">
-        <div id="status" class="status">Prêt</div>
+        <div id="status" class="status">En attente du signal GPS...</div>
         <button id="btn-record" onclick="toggleRecord()">START</button>
         <div id="save-section">
             <button id="btn-save" onclick="saveTrace()">ENREGISTRER LE TRACÉ</button>
@@ -36,11 +36,11 @@
             polyline = L.polyline([], {color: '#3498db', weight: 5}).addTo(map);
             userMarker = L.marker([50.66, 4.20]).addTo(map);
             
-            // Demande la permission dès l'ouverture
+            // Test immédiat du GPS
             navigator.geolocation.getCurrentPosition(() => {
-                document.getElementById('status').innerText = "GPS Connecté";
-            }, (err) => {
-                document.getElementById('status').innerText = "Erreur GPS : Activez la localisation";
+                document.getElementById('status').innerText = "GPS Prêt";
+            }, () => {
+                document.getElementById('status').innerText = "Erreur : Activez la localisation";
             });
         }
 
@@ -52,10 +52,14 @@
                 trajet = []; polyline.setLatLngs([]);
                 btn.innerText = "STOP"; btn.classList.add('recording');
                 saveSec.style.display = "none";
+                document.getElementById('status').innerText = "Tracé en cours...";
                 startTracking();
             } else {
                 btn.innerText = "START"; btn.classList.remove('recording');
-                if (trajet.length > 0) saveSec.style.display = "block";
+                if (trajet.length > 0) {
+                    saveSec.style.display = "block";
+                    document.getElementById('status').innerText = "Tracé terminé (" + trajet.length + " points)";
+                }
             }
         }
 
@@ -65,23 +69,31 @@
                 const latlng = [pos.coords.latitude, pos.coords.longitude];
                 userMarker.setLatLng(latlng); map.panTo(latlng);
                 if (isRecording) {
-                    trajet.push({lat: latlng[0], lon: latlng[1], time: new Date().toISOString()});
+                    trajet.push({lat: latlng[0], lon: latlng[1], time: new Date().toLocaleTimeString()});
                     polyline.addLatLng(latlng);
-                    document.getElementById('status').innerText = trajet.length + " points";
+                    document.getElementById('status').innerText = trajet.length + " points capturés";
                     setTimeout(startTracking, 5000);
                 }
             }, (err) => {
-                document.getElementById('status').innerText = "Signal perdu...";
+                console.warn(err);
                 if(isRecording) setTimeout(startTracking, 5000);
-            }, { enableHighAccuracy: true, timeout: 10000 });
+            }, { enableHighAccuracy: true });
         }
 
+        // Nouvelle méthode de sauvegarde plus robuste
         function saveTrace() {
-            const blob = new Blob([JSON.stringify(trajet)], {type: "application/json"});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = "trajet_" + Date.now() + ".json";
-            a.click();
+            try {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(trajet));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "parcours_" + Date.now() + ".json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                alert("Sauvegarde envoyée ! Vérifie tes notifications ou le dossier Downloads.");
+            } catch (e) {
+                alert("Erreur technique : " + e.message);
+            }
         }
         window.onload = initMap;
     </script>
