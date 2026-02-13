@@ -6,76 +6,33 @@
     <title>Traceur GPS Pro</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <style>
-        body { 
-            margin: 0; padding: 0; display: flex; flex-direction: column; 
-            height: 100vh; background-color: #1a1a1a; color: white; font-family: sans-serif; 
-        }
-        #map { height: 60vh; width: 100%; background: #222; } 
-        
-        .controls { 
-            padding: 20px; display: flex; flex-direction: column; 
-            align-items: center; background: #1a1a1a; border-top: 2px solid #333;
-            flex: 1;
-        }
-        
-        #btn-record {
-            width: 80px; height: 80px; border-radius: 50%; border: none;
-            background-color: #e74c3c; color: white; font-weight: bold;
-            cursor: pointer; box-shadow: 0 0 15px rgba(231, 76, 60, 0.4);
-            margin-bottom: 20px;
-        }
-        
-        #btn-record.recording { background-color: #2ecc71; animation: pulse 1.5s infinite; }
-        
-        #save-section { 
-            display: none; 
-            width: 90%; 
-            background: #2c3e50; 
-            padding: 15px; 
-            border-radius: 10px; 
-            text-align: center;
-        }
-
-        #btn-share {
-            background-color: #f39c12;
-            color: white;
-            border: none;
-            padding: 15px 20px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            font-size: 1rem;
-        }
-
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background: #1a1a1a; color: white; font-family: sans-serif; }
+        #map { height: 60vh; width: 100%; } 
+        .controls { padding: 20px; display: flex; flex-direction: column; align-items: center; background: #1a1a1a; flex: 1; border-top: 2px solid #333; }
+        #btn-record { width: 80px; height: 80px; border-radius: 50%; border: none; background: #e74c3c; color: white; font-weight: bold; margin-bottom: 20px; box-shadow: 0 0 15px rgba(231,76,60,0.4); }
+        #btn-record.recording { background: #2ecc71; animation: pulse 1.5s infinite; }
+        #save-section { display: none; width: 90%; background: #2c3e50; padding: 15px; border-radius: 10px; text-align: center; }
+        #btn-share { background: #f39c12; color: white; border: none; padding: 15px; border-radius: 8px; width: 100%; font-weight: bold; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-        .info-gps { color: #f1c40f; margin-bottom: 10px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
-
     <div id="map"></div>
-
     <div class="controls">
-        <div id="statut" class="info-gps">Prêt à démarrer</div>
-        
+        <div id="statut" style="color:#f1c40f; margin-bottom:10px;">Prêt</div>
         <button id="btn-record" onclick="toggleRecord()">START</button>
-        
         <div id="save-section">
-            <p style="margin:0 0 10px 0; font-size: 0.9rem;">Tracé terminé !</p>
-            <button id="btn-share" onclick="shareTrace()">ENREGISTRER OU PARTAGER</button>
+            <button id="btn-share" onclick="nativeShare()">ENREGISTRER OU PARTAGER</button>
         </div>
     </div>
 
+    <script src="https://unpkg.com/@capacitor/core@latest/dist/capacitor.js"></script>
     <script>
-        let isRecording = false;
-        let trajet = [];
-        let map, polyline, userMarker;
+        let isRecording = false; let trajet = []; let map, polyline, userMarker;
         
         function initMap() {
-            map = L.map('map').setView([50.66, 4.20], 16); 
+            map = L.map('map').setView([50.66, 4.20], 16);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             polyline = L.polyline([], {color: '#3498db', weight: 6}).addTo(map);
             userMarker = L.marker([50.66, 4.20]).addTo(map);
@@ -84,24 +41,14 @@
         function toggleRecord() {
             isRecording = !isRecording;
             const btn = document.getElementById('btn-record');
-            const saveSec = document.getElementById('save-section');
-            
             if (isRecording) {
-                trajet = [];
-                polyline.setLatLngs([]);
-                btn.innerText = "STOP";
-                btn.classList.add('recording');
-                saveSec.style.display = "none";
-                document.getElementById('statut').innerText = "Enregistrement en cours...";
+                trajet = []; polyline.setLatLngs([]);
+                btn.innerText = "STOP"; btn.classList.add('recording');
+                document.getElementById('save-section').style.display = "none";
                 startTracking();
             } else {
-                btn.innerText = "START";
-                btn.classList.remove('recording');
-                document.getElementById('statut').innerText = "Points capturés : " + trajet.length;
-                if (trajet.length > 1) {
-                    saveSec.style.display = "block";
-                    map.fitBounds(polyline.getBounds());
-                }
+                btn.innerText = "START"; btn.classList.remove('recording');
+                if (trajet.length > 1) document.getElementById('save-section').style.display = "block";
             }
         }
 
@@ -109,51 +56,33 @@
             if (!isRecording) return;
             navigator.geolocation.getCurrentPosition((pos) => {
                 const latlng = [pos.coords.latitude, pos.coords.longitude];
-                userMarker.setLatLng(latlng);
-                map.panTo(latlng);
+                userMarker.setLatLng(latlng); map.panTo(latlng);
                 if (isRecording) {
-                    trajet.push({
-                        lat: latlng[0], 
-                        lon: latlng[1], 
-                        heure: new Date().toLocaleTimeString()
-                    });
+                    trajet.push({lat: latlng[0], lon: latlng[1], time: new Date().toISOString()});
                     polyline.addLatLng(latlng);
-                    document.getElementById('statut').innerText = trajet.length + " points enregistrés";
-                    setTimeout(startTracking, 5000); 
+                    document.getElementById('statut').innerText = trajet.length + " points";
+                    setTimeout(startTracking, 5000);
                 }
             }, null, { enableHighAccuracy: true });
         }
 
-        // --- NOUVELLE FONCTION DE PARTAGE / SAUVEGARDE LIBRE ---
-        async function shareTrace() {
-            const fileName = "trajet_" + new Date().getTime() + ".json";
+        async function nativeShare() {
             const content = JSON.stringify(trajet, null, 2);
-            
-            // On crée un fichier virtuel
-            const file = new File([content], fileName, { type: 'application/json' });
-
-            // On vérifie si ton téléphone supporte le partage de fichiers
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Mon Trajet GPS',
-                        text: 'Voici mon tracé enregistré avec mon application.'
-                    });
-                } catch (err) {
-                    console.log("Partage annulé ou erreur :", err);
-                }
+            // On utilise l'API de partage native si disponible via Capacitor
+            if (window.Capacitor && window.Capacitor.Plugins.Share) {
+                await window.Capacitor.Plugins.Share.share({
+                    title: 'Mon Trajet',
+                    text: content,
+                    dialogTitle: 'Où enregistrer le tracé ?'
+                });
             } else {
-                // Secours si le partage ne marche pas
-                alert("Le partage n'est pas supporté, essai du téléchargement classique.");
-                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(content);
+                // Secours pour le test
+                const blob = new Blob([content], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = dataStr;
-                a.download = fileName;
-                a.click();
+                a.href = url; a.download = "trajet.json"; a.click();
             }
         }
-
         window.onload = initMap;
     </script>
 </body>
