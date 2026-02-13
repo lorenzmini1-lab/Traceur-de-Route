@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Traceur GPS Intégral</title>
+    <title>Traceur GPS Pro</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -30,7 +30,7 @@
         </div>
         <button id="btn-record" onclick="toggleRecord()">START</button>
         <div id="save-section">
-            <button id="btn-save" onclick="saveTrace()">💾 ENREGISTRER LE TRACÉ</button>
+            <button id="btn-save" onclick="saveTrace()">💾 ENREGISTRER POUR GOOGLE MAPS (.GPX)</button>
         </div>
     </div>
 
@@ -88,14 +88,35 @@
             }, null, { enableHighAccuracy: true });
         }
 
-        // VERSION RÉPARÉE : Utilise une URL de données directe
         function saveTrace() {
-            const data = JSON.stringify(trajet);
-            const link = document.createElement('a');
-            link.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(data);
-            link.download = `trajet_${Date.now()}.json`;
-            link.click();
-            alert("Sauvegarde lancée !");
+            try {
+                // Construction du fichier GPX (Format standard Google Maps)
+                let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n';
+                gpx += '<gpx version="1.1" creator="TraceurGPS" xmlns="http://www.topografix.com/GPX/1/1">\n';
+                gpx += '  <trk><name>Mon Parcours</name><trkseg>\n';
+                
+                trajet.forEach(p => {
+                    gpx += `    <trkpt lat="${p.lat}" lon="${p.lon}"><time>${p.time}</time></trkpt>\n`;
+                });
+                
+                gpx += '  </trkseg></trk>\n</gpx>';
+
+                const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `parcours_${Date.now()}.gpx`;
+                document.body.appendChild(link);
+                link.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    alert("Fichier GPX créé ! Importe-le dans 'Mes Cartes' sur Google Maps.");
+                }, 500);
+            } catch (err) {
+                alert("Erreur : " + err.message);
+            }
         }
 
         window.onload = initMap;
