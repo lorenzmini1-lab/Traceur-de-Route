@@ -14,27 +14,32 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      # 1. Installation de Node.js v22 (Requis par Capacitor CLI)
+      # 1. Setup Node v22 (Requis pour Capacitor)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      # 2. Installation de Capacitor et dépendances
+      # 2. Installation et Configuration Capacitor
+      # J'ai créé un dossier 'www' temporaire pour éviter l'erreur du webDir "."
       - name: Installer Capacitor
         run: |
+          mkdir -p www
+          cp index.html www/
+          cp -r * www/ 2>/dev/null || true
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir .
+          npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir www
           npx cap add android
+          npx cap copy android
 
-      # 3. Setup de Java pour la compilation
+      # 3. Setup de Java
       - name: set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 4. Extraction de la version depuis l'index.html
+      # 4. Extraction de la version
       - name: Extraire la version
         id: get_version
         run: |
@@ -48,12 +53,12 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      # 6. Préparation du fichier pour le déploiement
+      # 6. Préparation de l'APK pour le déploiement
       - name: Préparer l'APK
         run: |
           cp android/app/build/outputs/apk/release/app-release-unsigned.apk ./app-release.apk
 
-      # 7. Mise à jour automatique de version.json
+      # 7. Update version.json
       - name: Update version.json
         run: |
           echo '{
@@ -61,7 +66,7 @@ jobs:
             "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
           }' > version.json
 
-      # 8. Publication sur GitHub Pages
+      # 8. Publication
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
