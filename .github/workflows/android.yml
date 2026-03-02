@@ -1,50 +1,37 @@
-name: Build Traceur GPS
-on: [push]
+name: Build & Auto-Update APK
+
+on:
+  push:
+    branches: [ main ] # Se déclenche quand tu envoies du code sur main
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      # Étape 1 : Simulation de la version (on peut l'extraire de ton code ou la définir ici)
+      - name: Définir le numéro de version
+        run: echo "APP_VERSION=1.1" >> $GITHUB_ENV
+
+      # Étape 2 : Création de l'APK (Si tu utilises un outil spécifique, adapte ici)
+      # Ici, on imagine que tu as déjà ton processus de build APK.
       
-      - name: set up JDK 21
-        uses: actions/setup-java@v4
+      # Étape 3 : Mise à jour automatique de version.json
+      - name: Update version.json
+        run: |
+          echo '{
+            "version": "'${{ env.APP_VERSION }}'",
+            "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
+          }' > version.json
+
+      # Étape 4 : Envoi sur GitHub Pages (branche gh-pages ou main)
+      - name: Deploy to GitHub Pages
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          
-      - name: Install Dependencies
-        run: |
-          npm install
-          npm install @capacitor/cli @capacitor/core @capacitor/android
-          npm install @capacitor/assets -g
-
-      - name: Initialize Capacitor
-        run: |
-          if [ ! -f "capacitor.config.json" ]; then
-            echo '{"appId": "com.traceur.gps", "appName": "Traceur de Route", "webDir": "www"}' > capacitor.config.json
-          fi
-          mkdir -p www
-          npx cap add android || echo "Ok"
-          npx cap sync android
-
-      - name: Fix Android Permissions
-        run: |
-          # Cette commande ajoute les droits GPS obligatoires dans le fichier système Android
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="true" />' android/app/src/main/AndroidManifest.xml
-
-      - name: Build APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug
-        
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: traceur-gps-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          commit_message: "Auto-update version.json to v${{ env.APP_VERSION }}"
+          file_pattern: 'version.json'
