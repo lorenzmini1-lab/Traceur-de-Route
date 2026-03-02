@@ -1,37 +1,55 @@
-name: Build & Auto-Update APK
+name: Build & Auto-Update Traceur de Route
 
 on:
   push:
-    branches: [ main ] # Se déclenche quand tu envoies du code sur main
+    branches: [ main ] # Se déclenche à chaque push sur la branche main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Autorise GitHub à modifier ton fichier version.json
 
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      # Étape 1 : Simulation de la version (on peut l'extraire de ton code ou la définir ici)
-      - name: Définir le numéro de version
-        run: echo "APP_VERSION=1.1" >> $GITHUB_ENV
+      # 1. Extraction automatique de la version depuis ton HTML
+      - name: Extraire la version
+        id: get_version
+        run: |
+          VERSION=$(grep -oP 'const CURRENT_LOCAL_VERSION = "\K[^"]+' index.html)
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Version détectée : $VERSION"
 
-      # Étape 2 : Création de l'APK (Si tu utilises un outil spécifique, adapte ici)
-      # Ici, on imagine que tu as déjà ton processus de build APK.
-      
-      # Étape 3 : Mise à jour automatique de version.json
-      - name: Update version.json
+      # 2. Préparation du fichier version.json
+      # On met à jour le JSON avec la version trouvée dans le HTML et le lien de l'APK
+      - name: Mettre à jour version.json
         run: |
           echo '{
             "version": "'${{ env.APP_VERSION }}'",
             "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
           }' > version.json
 
-      # Étape 4 : Envoi sur GitHub Pages (branche gh-pages ou main)
-      - name: Deploy to GitHub Pages
+      # 3. Simulation du Build APK (Remplace cette étape par ton outil de build si besoin)
+      # Ici, on s'assure que l'APK est bien présent pour GitHub Pages
+      - name: Vérifier l'APK
+        run: |
+          if [ ! -f "app-release.apk" ]; then
+            echo "Attention : app-release.apk absent du dépôt. Pense à le téléverser !"
+          fi
+
+      # 4. Commit et Push automatique du fichier version.json mis à jour
+      - name: Commit version.json
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Auto-update version.json to v${{ env.APP_VERSION }}"
+          commit_message: "🚀 Auto-update version.json vers v${{ env.APP_VERSION }}"
           file_pattern: 'version.json'
+
+      # 5. Déploiement sur GitHub Pages
+      - name: Déployer sur GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: . # Publie la racine du dépôt
+          publish_branch: gh-pages # Branche dédiée à l'affichage web
