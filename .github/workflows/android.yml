@@ -33,13 +33,21 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      # --- ÉTAPE CRUCIALE : AJOUT DES PERMISSIONS GPS ---
+      - name: Configurer les permissions Android
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          # On ajoute les lignes de permissions avant la balise <application>
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />' $MANIFEST
+
       - name: Extraire la version
         id: get_version
         run: |
           VERSION=$(grep -oP 'const CURRENT_LOCAL_VERSION = "\K[^"]+' www/index.html || echo "1.0")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # Changement ici : on utilise assembleDebug qui signe l'APK automatiquement
       - name: Build APK avec Gradle (Mode Debug)
         run: |
           npx cap sync android
@@ -47,7 +55,6 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      # On récupère l'APK de debug qui est déjà signé
       - name: Préparer l'APK
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
