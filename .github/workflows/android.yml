@@ -14,11 +14,13 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
+      # 1. Configuration Node v22
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
+      # 2. Préparation du dossier Web et Installation Capacitor
       - name: Installer Capacitor
         run: |
           mkdir -p www
@@ -27,38 +29,46 @@ jobs:
           npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir www
           npx cap add android
 
+      # 3. Setup de Java 21
       - name: set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      # --- ÉTAPE CRUCIALE : AJOUT DES PERMISSIONS GPS ---
-      - name: Configurer les permissions Android
-        run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          # On ajoute les lignes de permissions avant la balise <application>
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />' $MANIFEST
-
+      # 4. Extraction de la version
       - name: Extraire la version
         id: get_version
         run: |
           VERSION=$(grep -oP 'const CURRENT_LOCAL_VERSION = "\K[^"]+' www/index.html || echo "1.0")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Build APK avec Gradle (Mode Debug)
+      # 5. Synchronisation Capacitor
+      - name: Capacitor Sync
+        run: npx cap sync android
+
+      # 6. CONFIGURATION FORCÉE DU GPS (AndroidManifest)
+      - name: Ajouter les permissions GPS
         run: |
-          npx cap sync android
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          # On insère les permissions juste avant la balise <application>
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />' $MANIFEST
+
+      # 7. Build de l'APK en mode Debug (pour la signature automatique)
+      - name: Build APK avec Gradle
+        run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      # 8. Préparation de l'APK final
       - name: Préparer l'APK
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
 
+      # 9. Mise à jour de version.json
       - name: Update version.json
         run: |
           echo '{
@@ -66,6 +76,7 @@ jobs:
             "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
           }' > version.json
 
+      # 10. Publication
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
