@@ -14,18 +14,20 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      # 1. Setup Node v22 (Requis pour Capacitor)
+      # 1. Setup Node v22
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      # 2. Installation de Capacitor
+      # 2. Préparation des dossiers et Installation Capacitor
+      # On crée 'www', on y déplace le HTML, puis on init Capacitor
       - name: Installer Capacitor
         run: |
+          mkdir -p www
+          cp index.html www/
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          # On initialise sans dossier web spécifique pour l'instant
-          npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir . --confirm
+          npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir www
           npx cap add android
 
       # 3. Setup de Java
@@ -35,15 +37,14 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 4. Extraction de la version pour le JSON
+      # 4. Extraction de la version
       - name: Extraire la version
         id: get_version
         run: |
-          # On cherche la version dans index.html
           VERSION=$(grep -oP 'const CURRENT_LOCAL_VERSION = "\K[^"]+' index.html || echo "1.0")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # 5. Synchronisation et Build Gradle
+      # 5. Sync et Build de l'APK
       - name: Build APK avec Gradle
         run: |
           npx cap sync android
@@ -51,12 +52,12 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      # 6. Préparation de l'APK pour le déploiement
+      # 6. Récupération de l'APK
       - name: Préparer l'APK
         run: |
           cp android/app/build/outputs/apk/release/app-release-unsigned.apk ./app-release.apk
 
-      # 7. Création automatique du version.json
+      # 7. Création du version.json
       - name: Update version.json
         run: |
           echo '{
