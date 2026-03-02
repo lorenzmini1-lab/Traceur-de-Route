@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Traceur GPS Pro</title>
+    <title>Traceur GPS Pro+</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; background-color: #1a1a1a; color: white; font-family: sans-serif; }
         #map { flex: 1; width: 100%; background: #222; } 
-        .controls { padding: 20px; display: flex; flex-direction: column; align-items: center; background: #1a1a1a; border-top: 2px solid #333; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
-        #btn-record { width: 85px; height: 85px; border-radius: 50%; border: 4px solid #2c3e50; background-color: #e74c3c; color: white; font-weight: bold; font-size: 1.1rem; cursor: pointer; box-shadow: 0 0 15px rgba(231, 76, 60, 0.4); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; }
+        .controls { padding: 20px; display: flex; flex-direction: column; align-items: center; background: #1a1a1a; border-top: 2px solid #333; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); z-index: 1000; }
+        #btn-record { width: 85px; height: 85px; border-radius: 50%; border: 4px solid #2c3e50; background-color: #e74c3c; color: white; font-weight: bold; font-size: 1.1rem; cursor: pointer; box-shadow: 0 0 15px rgba(231, 76, 60, 0.4); margin-bottom: 15px; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
         #btn-record.recording { background-color: #2ecc71; border-color: #27ae60; animation: pulse 1.5s infinite; }
         #save-section { display: none; width: 100%; text-align: center; margin-top: 10px; }
         #btn-save { background-color: #3498db; color: white; border: none; padding: 18px 25px; border-radius: 12px; font-weight: bold; width: 95%; cursor: pointer; font-size: 1.1rem; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
         .status-container { text-align: center; margin-bottom: 12px; width: 100%; }
         #status { color: #f1c40f; font-size: 1rem; font-weight: bold; text-transform: uppercase; }
-        #coords { color: #888; font-size: 0.8rem; margin-top: 6px; font-family: monospace; }
+        #info-bar { color: #888; font-size: 0.85rem; margin-top: 6px; font-family: monospace; display: flex; justify-content: space-around; width: 100%; }
         .leaflet-control-attribution { display: none; }
     </style>
 </head>
@@ -25,99 +25,110 @@
     <div id="map"></div>
     <div class="controls">
         <div class="status-container">
-            <div id="status">Initialisation...</div>
-            <div id="coords">--.----- , --.-----</div>
+            <div id="status">Attente GPS...</div>
+            <div id="info-bar">
+                <span id="coords">--.--- , --.---</span>
+                <span id="dist">0.00 km</span>
+            </div>
         </div>
         <button id="btn-record" onclick="toggleRecord()">START</button>
         <div id="save-section">
-            <button id="btn-save" onclick="saveTrace()">💾 ENREGISTRER POUR GOOGLE MAPS (.GPX)</button>
+            <button id="btn-save" onclick="saveTrace()">💾 EXPORT GPX (GOOGLE MAPS)</button>
         </div>
     </div>
 
     <script>
-        let isRecording = false; let trajet = []; let map, polyline, userMarker;
-        const statusEl = document.getElementById('status');
-        const coordsEl = document.getElementById('coords');
+        let isRecording = false;
+        let trajet = JSON.parse(localStorage.getItem('last_track')) || [];
+        let map, polyline, userMarker, watchId, wakeLock = null;
+        let totalDistance = 0;
 
         function initMap() {
             map = L.map('map', { zoomControl: false }).setView([50.66, 4.20], 16); 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            polyline = L.polyline([], { color: '#3498db', weight: 7, opacity: 0.9 }).addTo(map);
-            userMarker = L.circleMarker([50.66, 4.20], { radius: 10, fillColor: "#3498db", color: "#fff", weight: 3, fillOpacity: 1 }).addTo(map);
             
-            navigator.geolocation.getCurrentPosition((pos) => {
-                updatePosition(pos.coords.latitude, pos.coords.longitude);
-                statusEl.innerText = "GPS PRÊT";
-            }, null, { enableHighAccuracy: true });
+            polyline = L.polyline(trajet.map(p => [p.lat, p.lon]), { color: '#3498db', weight: 6, opacity: 0.8 }).addTo(map);
+            userMarker = L.circleMarker([0, 0], { radius: 8, fillColor: "#3498db", color: "#fff", weight: 3, fillOpacity: 1 }).addTo(map);
+            
+            // Reprendre le tracé si existant
+            if (trajet.length > 0) {
+                document.getElementById('save-section').style.display = "block";
+                updateStats();
+            }
+
+            // Démarrage de l'observation continue
+            watchId = navigator.geolocation.watchPosition(handlePosition, handleError, {
+                enableHighAccuracy: true,
+                maximumAge: 0
+            });
         }
 
-        function updatePosition(lat, lon) {
+        async function handlePosition(pos) {
+            const { latitude: lat, longitude: lon } = pos.coords;
             userMarker.setLatLng([lat, lon]);
             map.panTo([lat, lon]);
-            coordsEl.innerText = `${lat.toFixed(6)} , ${lon.toFixed(6)}`;
+            document.getElementById('coords').innerText = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+
+            if (isRecording) {
+                const lastPoint = trajet[trajet.length - 1];
+                if (!lastPoint || getDist(lastPoint.lat, lastPoint.lon, lat, lon) > 0.005) { // Seuil 5m
+                    const newPoint = { lat, lon, time: new Date().toISOString() };
+                    trajet.push(newPoint);
+                    polyline.addLatLng([lat, lon]);
+                    localStorage.setItem('last_track', JSON.stringify(trajet));
+                    updateStats();
+                }
+            }
+            if (!isRecording && trajet.length === 0) document.getElementById('status').innerText = "GPS PRÊT";
         }
 
-        function toggleRecord() {
+        function updateStats() {
+            totalDistance = 0;
+            for (let i = 1; i < trajet.length; i++) {
+                totalDistance += getDist(trajet[i-1].lat, trajet[i-1].lon, trajet[i].lat, trajet[i].lon);
+            }
+            document.getElementById('dist').innerText = `${totalDistance.toFixed(2)} km`;
+            document.getElementById('status').innerText = `${trajet.length} POINTS`;
+        }
+
+        // Formule de Haversine pour la distance
+        function getDist(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        async function toggleRecord() {
             isRecording = !isRecording;
             const btn = document.getElementById('btn-record');
             const saveSec = document.getElementById('save-section');
+
             if (isRecording) {
-                trajet = []; polyline.setLatLngs([]);
+                trajet = []; polyline.setLatLngs([]); localStorage.removeItem('last_track');
                 btn.innerText = "STOP"; btn.classList.add('recording');
                 saveSec.style.display = "none";
-                statusEl.innerText = "ENREGISTREMENT...";
-                startTracking();
+                try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
             } else {
                 btn.innerText = "START"; btn.classList.remove('recording');
-                statusEl.innerText = "TERMINÉ";
+                if (wakeLock) { wakeLock.release(); wakeLock = null; }
                 if (trajet.length > 0) saveSec.style.display = "block";
+                document.getElementById('status').innerText = "TERMINÉ";
             }
-        }
-
-        function startTracking() {
-            if (!isRecording) return;
-            navigator.geolocation.getCurrentPosition((pos) => {
-                const lat = pos.coords.latitude; const lon = pos.coords.longitude;
-                updatePosition(lat, lon);
-                if (isRecording) {
-                    trajet.push({ lat, lon, time: new Date().toISOString() });
-                    polyline.addLatLng([lat, lon]);
-                    statusEl.innerText = `${trajet.length} POINTS`;
-                    setTimeout(startTracking, 5000);
-                }
-            }, null, { enableHighAccuracy: true });
         }
 
         function saveTrace() {
-            try {
-                // Construction du fichier GPX (Format standard Google Maps)
-                let gpx = '<?xml version="1.0" encoding="UTF-8"?>\n';
-                gpx += '<gpx version="1.1" creator="TraceurGPS" xmlns="http://www.topografix.com/GPX/1/1">\n';
-                gpx += '  <trk><name>Mon Parcours</name><trkseg>\n';
-                
-                trajet.forEach(p => {
-                    gpx += `    <trkpt lat="${p.lat}" lon="${p.lon}"><time>${p.time}</time></trkpt>\n`;
-                });
-                
-                gpx += '  </trkseg></trk>\n</gpx>';
-
-                const blob = new Blob([gpx], { type: 'application/gpx+xml' });
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `parcours_${Date.now()}.gpx`;
-                document.body.appendChild(link);
-                link.click();
-                
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                    alert("Fichier GPX créé ! Importe-le dans 'Mes Cartes' sur Google Maps.");
-                }, 500);
-            } catch (err) {
-                alert("Erreur : " + err.message);
-            }
+            let gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="TraceurGPS" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Parcours '+new Date().toLocaleDateString()+'</name><trkseg>';
+            trajet.forEach(p => gpx += `<trkpt lat="${p.lat}" lon="${p.lon}"><time>${p.time}</time></trkpt>`);
+            gpx += '</trkseg></trk></gpx>';
+            const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `trace_${Date.now()}.gpx`;
+            a.click();
         }
+
+        function handleError(err) { document.getElementById('status').innerText = "ERREUR GPS"; }
 
         window.onload = initMap;
     </script>
