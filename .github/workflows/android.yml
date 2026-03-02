@@ -14,42 +14,42 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      # 1. Installation de l'environnement Node.js (nécessaire pour Capacitor)
+      # 1. Installation de Node.js v22 (Requis par Capacitor CLI)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
-      # 2. Installation de Capacitor et des dépendances
+      # 2. Installation de Capacitor et dépendances
       - name: Installer Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir .
           npx cap add android
 
-      # 3. Setup de Java (nécessaire pour compiler l'APK)
+      # 3. Setup de Java pour la compilation
       - name: set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 4. Extraction de la version (pour ton version.json)
+      # 4. Extraction de la version depuis l'index.html
       - name: Extraire la version
         id: get_version
         run: |
           VERSION=$(grep -oP 'const CURRENT_LOCAL_VERSION = "\K[^"]+' index.html)
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # 5. Compilation de l'APK (Release)
+      # 5. Compilation de l'APK
       - name: Build APK avec Gradle
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      # 6. Renommer et déplacer l'APK pour GitHub Pages
-      - name: Préparer l'APK pour le déploiement
+      # 6. Préparation du fichier pour le déploiement
+      - name: Préparer l'APK
         run: |
           cp android/app/build/outputs/apk/release/app-release-unsigned.apk ./app-release.apk
 
@@ -61,7 +61,7 @@ jobs:
             "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
           }' > version.json
 
-      # 8. Commit et Push du JSON et de l'APK sur GitHub Pages
+      # 8. Publication sur GitHub Pages
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
