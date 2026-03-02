@@ -20,17 +20,13 @@ jobs:
         with:
           node-version: '22'
 
-      # 2. Installation et Configuration Capacitor
-      # J'ai créé un dossier 'www' temporaire pour éviter l'erreur du webDir "."
+      # 2. Installation de Capacitor
       - name: Installer Capacitor
         run: |
-          mkdir -p www
-          cp index.html www/
-          cp -r * www/ 2>/dev/null || true
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir www
+          # On initialise sans dossier web spécifique pour l'instant
+          npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir . --confirm
           npx cap add android
-          npx cap copy android
 
       # 3. Setup de Java
       - name: set up JDK 17
@@ -39,16 +35,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 4. Extraction de la version
+      # 4. Extraction de la version pour le JSON
       - name: Extraire la version
         id: get_version
         run: |
-          VERSION=$(grep -oP 'const CURRENT_LOCAL_VERSION = "\K[^"]+' index.html)
+          # On cherche la version dans index.html
+          VERSION=$(grep -oP 'const CURRENT_LOCAL_VERSION = "\K[^"]+' index.html || echo "1.0")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # 5. Compilation de l'APK
+      # 5. Synchronisation et Build Gradle
       - name: Build APK avec Gradle
         run: |
+          npx cap sync android
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
@@ -58,7 +56,7 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/release/app-release-unsigned.apk ./app-release.apk
 
-      # 7. Update version.json
+      # 7. Création automatique du version.json
       - name: Update version.json
         run: |
           echo '{
@@ -66,7 +64,7 @@ jobs:
             "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
           }' > version.json
 
-      # 8. Publication
+      # 8. Publication sur GitHub Pages
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
