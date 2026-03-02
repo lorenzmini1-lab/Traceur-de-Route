@@ -14,14 +14,13 @@ jobs:
       - name: Checkout du code
         uses: actions/checkout@v4
 
-      # 1. Setup Node v22 (Requis par Capacitor)
+      # 1. Setup Node v22
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       # 2. Préparation du dossier Web et Installation Capacitor
-      # On cherche n'importe quel fichier .html pour l'utiliser comme index
       - name: Installer Capacitor
         run: |
           mkdir -p www
@@ -30,21 +29,25 @@ jobs:
           npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir www
           npx cap add android
 
-      # 3. Setup de Java
-      - name: set up JDK 17
+      # 3. Setup de Java 21 (Nécessaire pour les nouveaux builds Android)
+      - name: set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '21' # On passe de 17 à 21 pour corriger l'erreur
           distribution: 'temurin'
 
-      # 4. Extraction de la version (avec sécurité si index.html est introuvable)
+      # 4. Accepter les licences Android
+      - name: Accepter les licences Android
+        run: yes | sdkmanager --licenses || true
+
+      # 5. Extraction de la version
       - name: Extraire la version
         id: get_version
         run: |
           VERSION=$(grep -oP 'const CURRENT_LOCAL_VERSION = "\K[^"]+' www/index.html || echo "1.0")
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
-      # 5. Build de l'APK avec Gradle
+      # 6. Build de l'APK avec Gradle
       - name: Build APK avec Gradle
         run: |
           npx cap sync android
@@ -52,12 +55,12 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      # 6. Récupération de l'APK final
+      # 7. Récupération de l'APK
       - name: Préparer l'APK
         run: |
           cp android/app/build/outputs/apk/release/app-release-unsigned.apk ./app-release.apk
 
-      # 7. Mise à jour de version.json
+      # 8. Mise à jour de version.json
       - name: Update version.json
         run: |
           echo '{
@@ -65,7 +68,7 @@ jobs:
             "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
           }' > version.json
 
-      # 8. Déploiement sur GitHub Pages
+      # 9. Déploiement sur GitHub Pages
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
