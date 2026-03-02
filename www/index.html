@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Traceur GPS Pro+</title>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="/icon.png">
+    <meta name="theme-color" content="#1a1a1a">
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -50,13 +55,13 @@
             polyline = L.polyline(trajet.map(p => [p.lat, p.lon]), { color: '#3498db', weight: 6, opacity: 0.8 }).addTo(map);
             userMarker = L.circleMarker([0, 0], { radius: 8, fillColor: "#3498db", color: "#fff", weight: 3, fillOpacity: 1 }).addTo(map);
             
-            // Reprendre le tracé si existant
             if (trajet.length > 0) {
                 document.getElementById('save-section').style.display = "block";
                 updateStats();
+                const last = trajet[trajet.length - 1];
+                map.setView([last.lat, last.lon], 16);
             }
 
-            // Démarrage de l'observation continue
             watchId = navigator.geolocation.watchPosition(handlePosition, handleError, {
                 enableHighAccuracy: true,
                 maximumAge: 0
@@ -71,7 +76,7 @@
 
             if (isRecording) {
                 const lastPoint = trajet[trajet.length - 1];
-                if (!lastPoint || getDist(lastPoint.lat, lastPoint.lon, lat, lon) > 0.005) { // Seuil 5m
+                if (!lastPoint || getDist(lastPoint.lat, lastPoint.lon, lat, lon) > 0.005) {
                     const newPoint = { lat, lon, time: new Date().toISOString() };
                     trajet.push(newPoint);
                     polyline.addLatLng([lat, lon]);
@@ -91,7 +96,6 @@
             document.getElementById('status').innerText = `${trajet.length} POINTS`;
         }
 
-        // Formule de Haversine pour la distance
         function getDist(lat1, lon1, lat2, lon2) {
             const R = 6371;
             const dLat = (lat2 - lat1) * Math.PI / 180;
