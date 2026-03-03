@@ -2,128 +2,145 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Traceur GPS Pro v2.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Traceur GPS Pro v2.1</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; background: #ecf0f1; }
-        #map { flex-grow: 1; width: 100%; border-top: 2px solid #2c3e50; }
-        .controls { padding: 15px; background: #2c3e50; color: white; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
-        button:active { opacity: 0.7; }
-        .btn-start { background: #27ae60; color: white; }
-        .btn-stop { background: #e74c3c; color: white; }
-        .btn-export { background: #3498db; color: white; }
-        #status { font-size: 0.9em; text-align: center; background: #1a252f; padding: 8px; color: #ecf0f1; font-weight: bold; }
-        .version-badge { font-size: 0.7em; color: #95a5a6; margin-left: 5px; }
+        /* Reset complet pour mobile */
+        * { box-sizing: border-box; }
+        body, html { 
+            margin: 0; padding: 0; 
+            height: 100%; width: 100%;
+            overflow: hidden; /* Empêche le scroll inutile du corps */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #2c3e50;
+        }
+
+        /* Conteneur principal en Flexbox */
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Barre de contrôle adaptative */
+        .controls { 
+            padding: 10px; 
+            background: #2c3e50; 
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr; /* 3 colonnes égales */
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        button { 
+            padding: 15px 5px; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 0.8em;
+            text-transform: uppercase;
+            color: white;
+            transition: transform 0.1s;
+        }
+
+        button:active { transform: scale(0.95); }
+        .btn-start { background: #27ae60; }
+        .btn-stop { background: #e74c3c; }
+        .btn-export { background: #3498db; }
+
+        /* Statut bien lisible */
+        #status { 
+            font-size: 0.85em; 
+            text-align: center; 
+            background: #1a252f; 
+            padding: 8px; 
+            color: #ecf0f1; 
+            border-bottom: 1px solid #34495e;
+        }
+
+        /* La carte prend TOUT le reste de l'écran */
+        #map { 
+            flex: 1; 
+            width: 100%; 
+        }
+
+        .version-badge { opacity: 0.5; font-size: 0.8em; }
     </style>
 </head>
 <body>
 
-    <div class="controls">
-        <button class="btn-start" onclick="startTracking()">DÉMARRER</button>
-        <button class="btn-stop" onclick="stopTracking()">ARRÊTER</button>
-        <button class="btn-export" onclick="exportGPX()">EXPORTER GPX</button>
+    <div class="app-container">
+        <div class="controls">
+            <button class="btn-start" onclick="startTracking()">Départ</button>
+            <button class="btn-stop" onclick="stopTracking()">Arrêt</button>
+            <button class="btn-export" onclick="exportGPX()">Export</button>
+        </div>
+        <div id="status">Statut : Prêt <span class="version-badge">v2.1</span></div>
+        <div id="map"></div>
     </div>
-    <div id="status">Statut : Prêt <span class="version-badge">v2.0</span></div>
-    <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <script>
-        // --- CONFIGURATION ---
-        const CURRENT_LOCAL_VERSION = "2.0"; // Version mise à jour
+        const CURRENT_LOCAL_VERSION = "2.1";
         let positions = []; 
         let watchId = null;
         let map, polyline;
 
-        // Initialisation de la carte
-        map = L.map('map').setView([46.6033, 1.8883], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        // Init Carte
+        map = L.map('map', { zoomControl: false }).setView([46.6, 1.8], 5);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        polyline = L.polyline([], {color: '#e74c3c', weight: 5, opacity: 0.8}).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        polyline = L.polyline([], {color: '#e74c3c', weight: 6}).addTo(map);
 
-        // Démarrer le suivi GPS
         function startTracking() {
             if (watchId) return;
-            document.getElementById('status').innerHTML = "Signal GPS en cours... <span class='version-badge'>v2.0</span>";
-            
+            document.getElementById('status').innerHTML = "📍 Recherche GPS... <span class='version-badge'>v2.1</span>";
             watchId = navigator.geolocation.watchPosition(
                 (pos) => {
                     const { latitude, longitude } = pos.coords;
                     const timestamp = new Date().toISOString();
-                    const newPos = [latitude, longitude];
-
-                    positions.push({ lat: latitude, lng: longitude, timestamp: timestamp });
-                    
-                    polyline.addLatLng(newPos);
-                    map.setView(newPos, 16);
-                    document.getElementById('status').innerHTML = `Enregistrement : ${positions.length} pts <span class='version-badge'>v2.0</span>`;
+                    positions.push({ lat: latitude, lng: longitude, timestamp });
+                    polyline.addLatLng([latitude, longitude]);
+                    map.setView([latitude, longitude], 16);
+                    document.getElementById('status').innerHTML = `🏃 ${positions.length} pts enregistrés <span class='version-badge'>v2.1</span>`;
                 },
-                (err) => {
-                    console.error(err);
-                    alert("Erreur GPS : Vérifie que la position est activée.");
-                },
-                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                (err) => alert("Active ton GPS !"),
+                { enableHighAccuracy: true }
             );
         }
 
-        // Arrêter le suivi
         function stopTracking() {
             if (watchId) {
                 navigator.geolocation.clearWatch(watchId);
                 watchId = null;
-                document.getElementById('status').innerHTML = "Suivi arrêté <span class='version-badge'>v2.0</span>";
+                document.getElementById('status').innerHTML = "🛑 Suivi stoppé <span class='version-badge'>v2.1</span>";
             }
         }
 
-        // --- EXPORT GPX (Compatible Android & Web) ---
         async function exportGPX() {
-            if (positions.length === 0) {
-                alert("Aucun point enregistré.");
-                return;
-            }
-
-            let gpx = `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="TraceurGPS_Pro" xmlns="http://www.topografix.com/GPX/1/1">
-    <trk>
-        <name>Trajet v2.0 - ${new Date().toLocaleString()}</name>
-        <trkseg>`;
-            
+            if (positions.length === 0) return alert("Rien à exporter.");
+            let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="TraceurPro" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>`;
             positions.forEach(p => {
-                gpx += `
-            <trkpt lat="${p.lat}" lon="${p.lng}"><time>${p.timestamp}</time></trkpt>`;
+                gpx += `<trkpt lat="${p.lat}" lon="${p.lng}"><time>${p.timestamp}</time></trkpt>`;
             });
-
-            gpx += `
-        </trkseg>
-    </trk>
-</gpx>`;
+            gpx += `</trkseg></trk></gpx>`;
 
             try {
-                // Utilisation du plugin Share de Capacitor si disponible
                 if (window.Capacitor && Capacitor.isPluginAvailable('Share')) {
-                    await Capacitor.Plugins.Share.share({
-                        title: 'Mon trajet GPX',
-                        text: gpx,
-                        fileName: 'trajet_pro.gpx'
-                    });
+                    await Capacitor.Plugins.Share.share({ title: 'Trajet GPX', text: gpx, fileName: 'trajet.gpx' });
                 } else {
-                    // Méthode de secours pour navigateur classique
                     const blob = new Blob([gpx], { type: 'application/gpx+xml' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'trajet_v2.gpx';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
+                    a.href = url; a.download = 'trajet.gpx'; a.click();
                 }
-            } catch (error) {
-                alert("Erreur lors du partage.");
-            }
+            } catch (e) { alert("Erreur export"); }
         }
     </script>
 </body>
