@@ -1,4 +1,4 @@
-name: Build Android APK (Auto-Compile)
+name: Build Android APK (Version 2.2 - Icon Fix)
 
 on:
   push:
@@ -19,15 +19,22 @@ jobs:
         with:
           node-version: '22'
 
-      # 1. Installation de Capacitor + Plugin Share (indispensable pour le GPX)
-      - name: Installer Capacitor et Plugins
+      - name: Installer Capacitor et Générateur d'icônes
         run: |
           mkdir -p www
           find . -maxdepth 1 -name "*.html" -exec cp {} www/index.html \;
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npm install @capacitor/share
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share
+          # Outil pour générer les icônes automatiquement
+          npm install @capacitor/assets --save-dev
           npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir www
           npx cap add android
+
+      - name: Générer les icônes Android
+        run: |
+          # Si le fichier icon.png existe, on génère les ressources
+          if [ -f "icon.png" ]; then
+            npx capacitor-assets generate --android
+          fi
 
       - name: set up JDK 21
         uses: actions/setup-java@v4
@@ -35,11 +42,9 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # 2. Synchronisation des plugins avec le projet Android
       - name: Capacitor Sync
         run: npx cap sync android
 
-      # 3. Forçage des permissions GPS dans le Manifest
       - name: Configurer les permissions Android
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
@@ -47,14 +52,6 @@ jobs:
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />' $MANIFEST
 
-      # 4. Extraction de la version (va lire "2.0" dans ton index.html)
-      - name: Extraire la version
-        id: get_version
-        run: |
-          VERSION=$(grep -oP 'const CURRENT_LOCAL_VERSION = "\K[^"]+' www/index.html || echo "2.0")
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-
-      # 5. Compilation en mode Debug (auto-signé pour test)
       - name: Build APK avec Gradle
         run: |
           cd android
@@ -65,11 +62,10 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
 
-      # 6. Mise à jour du fichier version.json pour le déploiement
       - name: Update version.json
         run: |
           echo '{
-            "version": "'${{ env.APP_VERSION }}'",
+            "version": "2.2",
             "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
           }' > version.json
 
