@@ -1,4 +1,4 @@
-name: Build Android APK (Version 2.2 - Icon Fix)
+name: Build Android APK (v2.3 - Auto-Version)
 
 on:
   push:
@@ -19,24 +19,24 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Installer Capacitor et Générateur d'icônes
+      - name: Installer Capacitor et Dépendances
         run: |
           mkdir -p www
-          find . -maxdepth 1 -name "*.html" -exec cp {} www/index.html \;
+          # On s'assure que ton index.html est bien copié dans le dossier de build
+          cp index.html www/index.html 
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share
-          # Outil pour générer les icônes automatiquement
-          npm install @capacitor/assets --save-dev
           npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir www
           npx cap add android
 
-      - name: Générer les icônes Android
+      - name: Mise à jour forcée de la version Android (Système)
         run: |
-          # Si le fichier icon.png existe, on génère les ressources
-          if [ -f "icon.png" ]; then
-            npx capacitor-assets generate --android
-          fi
+          # Ces lignes modifient le fichier de configuration Android "invisible"
+          # On met versionCode à 4 pour être sûr de dépasser la v1.0
+          sed -i 's/versionCode [0-9]*/versionCode 4/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "2.3"/' android/app/build.gradle
+          echo "✅ Version système mise à jour : 2.3 (Code 4)"
 
-      - name: set up JDK 21
+      - name: Configuration Java & SDK
         uses: actions/setup-java@v4
         with:
           java-version: '21'
@@ -45,31 +45,31 @@ jobs:
       - name: Capacitor Sync
         run: npx cap sync android
 
-      - name: Configurer les permissions Android
+      - name: Permissions GPS (Injection automatique)
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />' $MANIFEST
 
-      - name: Build APK avec Gradle
+      - name: Build APK Final
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Préparer l'APK final
+      - name: Déploiement de l'APK
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
 
-      - name: Update version.json
+      - name: Mise à jour du fichier version.json
         run: |
           echo '{
-            "version": "2.2",
+            "version": "2.3",
             "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
           }' > version.json
 
-      - name: Deploy to GitHub Pages
+      - name: Push sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
