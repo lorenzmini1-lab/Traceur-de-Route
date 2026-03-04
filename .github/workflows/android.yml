@@ -1,4 +1,4 @@
-Name: Build Android APK (v2.4 - Icônes et GPX)
+name: Build Android APK (v2.4 - Icônes et GPX)
 
 on:
   push:
