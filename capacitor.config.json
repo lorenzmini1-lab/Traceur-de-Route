@@ -2,6 +2,8 @@
   "appId": "com.traceur.gps",
   "appName": "Traceur de Route",
   "webDir": "www",
-  "bundledWebRuntime": false
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
 }
-
