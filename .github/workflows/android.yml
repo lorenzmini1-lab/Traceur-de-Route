@@ -44,7 +44,7 @@ jobs:
       - name: Mise à jour de la version (v2.5)
         run: |
           sed -i 's/versionCode [0-9]*/versionCode 7/' android/app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "2.4"/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "2.5"/' android/app/build.gradle
 
       - name: Configuration Java & SDK
         uses: actions/setup-java@v4
