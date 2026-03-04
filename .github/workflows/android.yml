@@ -1,4 +1,4 @@
-name: Build Android APK (v2.3 - Fixed Path)
+Name: Build Android APK (v2.4 - Icônes et GPX)
 
 on:
   push:
@@ -19,19 +19,33 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Installer Capacitor et Dépendances
+      - name: Installer les outils
         run: |
-          # Pas besoin de créer www, il existe déjà chez toi !
-          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share
-          # On initialise avec ton dossier www existant
-          npx cap init "Traceur GPS Pro" "com.lorenzmini.traceur" --web-dir www
-          npx cap add android
+          # On installe tout d'un coup, y compris l'outil pour les icônes
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets
+          
+      - name: Générer les Icônes (Bleue et Verte)
+        run: |
+          # Cette commande va chercher icon.png à la racine et créer les icônes Android
+          # Assure-toi d'avoir un fichier icon.png dans ton projet !
+          if [ -f "icon.png" ]; then
+            npx capacitor-assets generate --android
+          else
+            echo "Attention: icon.png introuvable, l'icône ne sera pas mise à jour."
+          fi
 
-      - name: Mise à jour forcée de la version Android (Code 5)
+      - name: Initialiser Capacitor
         run: |
-          # On passe au code 5 pour écraser proprement la v1.0
-          sed -i 's/versionCode [0-9]*/versionCode 5/' android/app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "2.3"/' android/app/build.gradle
+          # On vérifie si le dossier android existe, sinon on le crée
+          if [ ! -d "android" ]; then
+            npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
+            npx cap add android
+          fi
+
+      - name: Mise à jour de la version (v2.4)
+        run: |
+          sed -i 's/versionCode [0-9]*/versionCode 6/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "2.4"/' android/app/build.gradle
 
       - name: Configuration Java & SDK
         uses: actions/setup-java@v4
@@ -42,28 +56,16 @@ jobs:
       - name: Capacitor Sync
         run: npx cap sync android
 
-      - name: Permissions GPS
-        run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
-          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
-
       - name: Build APK Final
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Déploiement de l'APK
+      - name: Déploiement
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-
-      - name: Mise à jour du fichier version.json
-        run: |
-          echo '{
-            "version": "2.3",
-            "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"
-          }' > version.json
+          echo '{"version": "2.4", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
       - name: Push sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
