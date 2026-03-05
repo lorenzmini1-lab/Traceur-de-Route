@@ -21,12 +21,11 @@ jobs:
 
       - name: Installer les outils
         run: |
-          # Installation des plugins indispensables
-          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets @capacitor-community/keep-awake
+          # Ajout de @capacitor/geolocation pour corriger l'autorisation de position
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets @capacitor-community/keep-awake @capacitor/geolocation
           
       - name: Générer les Icônes (Mappemonde)
         run: |
-          # On transforme ton icon.png en ressources Android
           if [ -f "icon.png" ]; then
             npx capacitor-assets generate --android
           else
@@ -41,10 +40,19 @@ jobs:
             npx cap add android
           fi
 
+      - name: Configuration des Permissions Android (GPS)
+        run: |
+          # On force l'ajout des permissions GPS dans le fichier AndroidManifest
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
+          fi
+
       - name: Mise à jour de la version (v2.6)
         run: |
-          # Passage au code 9 pour forcer la mise à jour sur le téléphone
-          sed -i 's/versionCode [0-9]*/versionCode 9/' android/app/build.gradle
+          # Passage au code 10 pour être sûr qu'Android voit le changement
+          sed -i 's/versionCode [0-9]*/versionCode 10/' android/app/build.gradle
           sed -i 's/versionName "[^"]*"/versionName "2.6"/' android/app/build.gradle
 
       - name: Configuration Java & SDK
