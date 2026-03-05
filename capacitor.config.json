@@ -3,23 +3,9 @@
   "appName": "Traceur de Route",
   "webDir": "www",
   "bundledWebRuntime": false,
-  "android": {
-    "allowMixedContent": true,
-    "buildOptions": {
-      "releaseType": "debug"
-    }
-  },
   "plugins": {
     "Geolocation": {
       "forceWebView": false
-    },
-    "KeepAwake": {
-      "copyAndroidResources": true
-    },
-    "Share": {
-      "android": {
-        "text": "Voici mon tracé GPX"
-      }
     }
   }
 }
