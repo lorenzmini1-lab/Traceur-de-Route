@@ -1,4 +1,4 @@
-name: Build Android APK (v2.7.2 - Icon Force)
+name: Build Android APK (v2.7.3)
 
 on:
   push:
@@ -23,6 +23,7 @@ jobs:
         run: |
           mkdir -p www
           npm install --force
+          npm install @capacitor/assets --save-dev --force
 
       - name: Initialisation
         run: |
@@ -30,25 +31,21 @@ jobs:
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Force Icon Generation
+      - name: Icon Regen (v2.7.3)
         run: |
-          # ICI : On ajoute --force pour débloquer l'étape rouge de ta capture
-          npm install @capacitor/assets --save-dev --force
           if [ -f "icon.png" ]; then
             npx capacitor-assets generate --android
-          else
-            echo "ERREUR : icon.png manquant !"
-            exit 1
           fi
 
-      - name: Permissions & Version (2.7.2)
+      - name: Permissions & Versioning
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           GRADLE="android/app/build.gradle"
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
-          sed -i 's/versionCode [0-9]*/versionCode 22/' $GRADLE
-          sed -i 's/versionName "[^"]*"/versionName "2.7.2"/' $GRADLE
+          # On passe au versionCode 23
+          sed -i 's/versionCode [0-9]*/versionCode 23/' $GRADLE
+          sed -i 's/versionName "[^"]*"/versionName "2.7.3"/' $GRADLE
 
       - name: Java & Build
         uses: actions/setup-java@v4
@@ -66,7 +63,7 @@ jobs:
       - name: Deploy
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          echo '{"version": "2.7.2", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
+          echo '{"version": "2.7.3", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
       - name: Push
         uses: peaceiris/actions-gh-pages@v3
