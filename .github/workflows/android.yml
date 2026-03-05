@@ -1,4 +1,4 @@
-name: Build Android APK (v2.6.2 - Final Fix)
+name: Build Android APK (v2.7.0 - Force Update)
 
 on:
   push:
@@ -23,32 +23,31 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets @capacitor-community/keep-awake @capacitor/geolocation
           
-      - name: Initialiser le projet Android
+      - name: Initialiser le projet Android (Nettoyage Forcé)
         run: |
-          # On s'assure que le dossier www existe (requis par Capacitor)
           mkdir -p www
-          # On initialise Capacitor et on ajoute la plateforme Android
+          # Suppression de l'ancien dossier pour éviter l'erreur "already exists"
+          rm -rf android
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Correction et Versioning
+      - name: Correction et Versioning (v2.7.0)
         run: |
-          # On attend 2 secondes pour être sûr que le système de fichiers est prêt
-          sleep 2
           GRADLE="android/app/build.gradle"
           MANIFEST="android/app/src/main/AndroidManifest.xml"
 
           if [ -f "$GRADLE" ]; then
-            # Mise à jour versionCode 15
-            sed -i 's/versionCode [0-9]*/versionCode 15/' $GRADLE
-            sed -i 's/versionName "[^"]*"/versionName "2.6.2"/' $GRADLE
+            # On passe au code 17 pour forcer la mise à jour système
+            sed -i 's/versionCode [0-9]*/versionCode 17/' $GRADLE
+            sed -i 's/versionName "[^"]*"/versionName "2.7.0"/' $GRADLE
           fi
 
           if [ -f "$MANIFEST" ]; then
-            # Injection forcée des permissions et de l'icône
+            # Ré-injection des permissions indispensables
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
+            # Force l'utilisation de la nouvelle icône mappemonde
             sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@mipmap\/icon"/' $MANIFEST
             sed -i 's/android:roundIcon="@mipmap\/ic_launcher_round"/android:roundIcon="@mipmap\/icon"/' $MANIFEST
           fi
@@ -77,7 +76,7 @@ jobs:
       - name: Déploiement
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          echo '{"version": "2.6.2", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
+          echo '{"version": "2.7.0", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
       - name: Push sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
