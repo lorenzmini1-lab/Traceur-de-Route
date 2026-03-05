@@ -1,21 +1,13 @@
 {
-  "name": "traceur-de-route",
-  "version": "1.0.0",
-  "description": "Mon application de traçage GPS",
-  "main": "index.js",
+  "name": "traceur-gps",
+  "version": "2.7.1",
   "dependencies": {
-    "@capacitor/android": "latest",
-    "@capacitor/cli": "latest",
-    "@capacitor/core": "latest",
-    "@capacitor/share": "latest",
-    "@capacitor/filesystem": "latest"
-  },
-  "devDependencies": {
-    "@capacitor/assets": "latest"
-  },
-  "scripts": {
-    "build": "npx cap copy && npx cap update",
-    "icons": "npx capacitor-assets generate --android",
-    "sync": "npx cap sync android"
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/geolocation": "^6.0.0",
+    "@capacitor/share": "^6.0.0",
+    "@capacitor-community/keep-awake": "^4.0.0",
+    "@capacitor/assets": "^3.0.0"
   }
 }
