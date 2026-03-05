@@ -1,4 +1,4 @@
-name: Build Android APK (v2.5 - Icônes et GPX)
+name: Build Android APK (v2.6 - Icônes, GPX et WakeLock)
 
 on:
   push:
@@ -21,16 +21,16 @@ jobs:
 
       - name: Installer les outils
         run: |
-          # Installation des plugins pour le GPX et l'outil pour l'icône
-          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets
+          # Installation des plugins indispensables
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets @capacitor-community/keep-awake
           
       - name: Générer les Icônes (Mappemonde)
         run: |
-          # On transforme ton icon.png en toutes les tailles Android
+          # On transforme ton icon.png en ressources Android
           if [ -f "icon.png" ]; then
             npx capacitor-assets generate --android
           else
-            echo "ERREUR : icon.png est introuvable à la racine du projet !"
+            echo "ERREUR : icon.png est introuvable !"
             exit 1
           fi
 
@@ -41,10 +41,11 @@ jobs:
             npx cap add android
           fi
 
-      - name: Mise à jour de la version (v2.5)
+      - name: Mise à jour de la version (v2.6)
         run: |
-          sed -i 's/versionCode [0-9]*/versionCode 7/' android/app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "2.5"/' android/app/build.gradle
+          # Passage au code 9 pour forcer la mise à jour sur le téléphone
+          sed -i 's/versionCode [0-9]*/versionCode 9/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "2.6"/' android/app/build.gradle
 
       - name: Configuration Java & SDK
         uses: actions/setup-java@v4
@@ -64,7 +65,7 @@ jobs:
       - name: Déploiement
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          echo '{"version": "2.5", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
+          echo '{"version": "2.6", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
       - name: Push sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
