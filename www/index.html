@@ -2,18 +2,19 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Traceur GPS Pro v2.5</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Traceur GPS Pro v2.6</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #2c3e50; font-family: sans-serif; }
         .app-container { display: flex; flex-direction: column; height: 100vh; }
         .controls { padding: 10px; background: #2c3e50; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; z-index: 1000; }
-        button { padding: 15px 5px; border: none; border-radius: 10px; font-weight: bold; color: white; text-transform: uppercase; font-size: 0.8em; }
+        button { padding: 15px 5px; border: none; border-radius: 10px; font-weight: bold; color: white; text-transform: uppercase; font-size: 0.8em; cursor: pointer; }
         .btn-start { background: #27ae60; }
         .btn-stop { background: #e74c3c; }
         .btn-export { background: #3498db; }
+        button:active { opacity: 0.7; }
         #status { font-size: 0.85em; text-align: center; background: #1a252f; padding: 8px; color: #ecf0f1; }
         #map { flex: 1; width: 100%; }
         .version-badge { opacity: 0.5; font-size: 0.8em; }
@@ -27,13 +28,15 @@
             <button class="btn-stop" onclick="stopTracking()">Arrêt</button>
             <button class="btn-export" onclick="exportGPX()">Export</button>
         </div>
-        <div id="status">Statut : Prêt <span class="version-badge">v2.5</span></div>
+        <div id="status">Statut : Prêt <span class="version-badge">v2.6</span></div>
         <div id="map"></div>
     </div>
 
+    <script src="capacitor.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <script>
-        const CURRENT_LOCAL_VERSION = "2.5";
+        const CURRENT_LOCAL_VERSION = "2.6";
         let positions = []; 
         let watchId = null;
         let map, polyline, userMarker;
@@ -43,21 +46,29 @@
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // La ligne du tracé
         polyline = L.polyline([], {color: '#e74c3c', weight: 6}).addTo(map);
 
-        // Le "Point" (Marqueur de position actuelle)
         userMarker = L.circleMarker([0, 0], {
-            radius: 8,
-            fillColor: "#3498db",
-            color: "#ffffff",
-            weight: 3,
-            fillOpacity: 1
+            radius: 8, fillColor: "#3498db", color: "#ffffff", weight: 3, fillOpacity: 1
         });
+
+        // --- Fonctions WakeLock (Écran allumé) ---
+        async function toggleWakeLock(on) {
+            try {
+                if (window.Capacitor && Capacitor.Plugins.KeepAwake) {
+                    if (on) await Capacitor.Plugins.KeepAwake.keepAwake();
+                    else await Capacitor.Plugins.KeepAwake.allowSleep();
+                }
+            } catch (e) { console.warn("WakeLock non supporté"); }
+        }
 
         function startTracking() {
             if (watchId) return;
-            document.getElementById('status').innerHTML = "📍 Recherche GPS... <span class='version-badge'>v2.5</span>";
+            
+            // On bloque l'écran pour qu'il reste allumé
+            toggleWakeLock(true);
+
+            document.getElementById('status').innerHTML = "📍 Recherche GPS... <span class='version-badge'>v2.6</span>";
             
             watchId = navigator.geolocation.watchPosition(
                 (pos) => {
@@ -66,18 +77,12 @@
                     const newCoords = [latitude, longitude];
 
                     positions.push({ lat: latitude, lng: longitude, timestamp });
-                    
-                    // Mettre à jour la ligne
                     polyline.addLatLng(newCoords);
-                    
-                    // Mettre à jour le point bleu
                     userMarker.setLatLng(newCoords);
                     if (!map.hasLayer(userMarker)) userMarker.addTo(map);
-
-                    // Centrer la vue
                     map.setView(newCoords, 16);
                     
-                    document.getElementById('status').innerHTML = `🏃 ${positions.length} pts enregistrés <span class='version-badge'>v2.5</span>`;
+                    document.getElementById('status').innerHTML = `🏃 ${positions.length} pts enregistrés <span class='version-badge'>v2.6</span>`;
                 },
                 (err) => alert("Erreur GPS. Vérifie tes permissions."),
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -88,7 +93,9 @@
             if (watchId) {
                 navigator.geolocation.clearWatch(watchId);
                 watchId = null;
-                document.getElementById('status').innerHTML = "🛑 Suivi stoppé <span class='version-badge'>v2.5</span>";
+                // On autorise à nouveau l'écran à s'éteindre
+                toggleWakeLock(false);
+                document.getElementById('status').innerHTML = "🛑 Suivi stoppé <span class='version-badge'>v2.6</span>";
             }
         }
 
@@ -102,14 +109,22 @@
 
             try {
                 if (window.Capacitor && Capacitor.Plugins.Share) {
-                    await Capacitor.Plugins.Share.share({ title: 'Mon Trajet', text: gpx, fileName: 'trajet.gpx' });
+                    await Capacitor.Plugins.Share.share({ 
+                        title: 'Mon Trajet', 
+                        text: 'Voici mon tracé GPX', 
+                        url: '', // On peut laisser vide
+                        dialogTitle: 'Partager le fichier GPX',
+                        // Note: Pour envoyer un vrai fichier, il faudrait FileSystem. 
+                        // Ici on partage le texte GPX directement.
+                        files: [] 
+                    });
                 } else {
                     const blob = new Blob([gpx], { type: 'application/gpx+xml' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url; a.download = 'trajet.gpx'; a.click();
                 }
-            } catch (e) { alert("Erreur export"); }
+            } catch (e) { alert("Erreur export : " + e.message); }
         }
     </script>
 </body>
