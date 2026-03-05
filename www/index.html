@@ -3,32 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Traceur GPS Pro v2.7.1</title>
+    <title>Traceur GPS Pro v2.7.3</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { box-sizing: border-box; touch-action: manipulation; }
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #2c3e50; font-family: sans-serif; }
         .app-container { display: flex; flex-direction: column; height: 100vh; }
-        .controls { padding: 12px; background: #2c3e50; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-        button { padding: 15px 5px; border: none; border-radius: 12px; font-weight: bold; color: white; text-transform: uppercase; font-size: 0.85em; cursor: pointer; transition: transform 0.1s; }
-        button:active { transform: scale(0.95); opacity: 0.8; }
+        .header-info { background: #1a252f; color: #3498db; text-align: center; padding: 5px; font-size: 0.8em; font-weight: bold; }
+        .controls { padding: 12px; background: #2c3e50; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; z-index: 1000; }
+        button { padding: 15px 5px; border: none; border-radius: 12px; font-weight: bold; color: white; text-transform: uppercase; font-size: 0.85em; cursor: pointer; }
         .btn-start { background: #27ae60; }
         .btn-stop { background: #e74c3c; }
         .btn-export { background: #3498db; }
         #status { font-size: 0.9em; text-align: center; background: #1a252f; padding: 10px; color: #ecf0f1; border-bottom: 1px solid #34495e; }
         #map { flex: 1; width: 100%; z-index: 1; }
-        .version-badge { opacity: 0.6; font-size: 0.8em; font-weight: normal; }
     </style>
 </head>
 <body>
     <div class="app-container">
+        <div class="header-info">TRACEUR DE ROUTE - VERSION 2.7.3</div>
+        <div id="status">Prêt <span style="opacity:0.5">(v2.7.3)</span></div>
+        <div id="map"></div>
         <div class="controls">
             <button class="btn-start" onclick="startTracking()">Départ</button>
             <button class="btn-stop" onclick="stopTracking()">Arrêt</button>
             <button class="btn-export" onclick="exportGPX()">Export</button>
         </div>
-        <div id="status">Prêt à tracer <span class="version-badge">v2.7.1</span></div>
-        <div id="map"></div>
     </div>
 
     <script src="capacitor.js"></script>
@@ -38,81 +38,47 @@
         let watchId = null;
         let map, polyline, userMarker;
 
-        // Initialisation de la carte Leaflet
         map = L.map('map', { zoomControl: false, attributionControl: false }).setView([46.6, 1.8], 5);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        polyline = L.polyline([], {color: '#e74c3c', weight: 6, opacity: 0.8}).addTo(map);
+        polyline = L.polyline([], {color: '#e74c3c', weight: 6}).addTo(map);
         userMarker = L.circleMarker([0, 0], {radius: 9, fillColor: "#3498db", color: "#ffffff", weight: 3, fillOpacity: 1});
-
-        async function toggleWakeLock(on) {
-            try {
-                if (window.Capacitor && Capacitor.Plugins.KeepAwake) {
-                    if (on) await Capacitor.Plugins.KeepAwake.keepAwake();
-                    else await Capacitor.Plugins.KeepAwake.allowSleep();
-                }
-            } catch (e) { console.warn("WakeLock indisponible"); }
-        }
 
         async function startTracking() {
             if (watchId) return;
             try {
                 if (window.Capacitor && Capacitor.Plugins.Geolocation) {
-                    const status = await Capacitor.Plugins.Geolocation.requestPermissions();
-                    if (status.location !== 'granted') return alert("Le GPS est nécessaire !");
+                    await Capacitor.Plugins.Geolocation.requestPermissions();
+                    if (Capacitor.Plugins.KeepAwake) await Capacitor.Plugins.KeepAwake.keepAwake();
                 }
-                
-                await toggleWakeLock(true);
-                document.getElementById('status').innerHTML = "📍 Acquisition GPS... <span class='version-badge'>v2.7.1</span>";
-                
-                const trackOptions = { enableHighAccuracy: true, timeout: 10000 };
-                const onPos = (pos) => {
+                document.getElementById('status').innerHTML = "📍 GPS Actif (v2.7.3)";
+                watchId = await Capacitor.Plugins.Geolocation.watchPosition({ enableHighAccuracy: true }, (pos) => {
                     if (pos) {
-                        const { latitude, longitude } = pos.coords;
-                        const latlng = [latitude, longitude];
-                        positions.push({ lat: latitude, lng: longitude, time: new Date().toISOString() });
-                        polyline.addLatLng(latlng);
-                        userMarker.setLatLng(latlng).addTo(map);
-                        map.setView(latlng, 16);
-                        document.getElementById('status').innerHTML = `🏃 ${positions.length} points enregistrés <span class='version-badge'>v2.7.1</span>`;
+                        const coords = [pos.coords.latitude, pos.coords.longitude];
+                        positions.push({ lat: pos.coords.latitude, lng: pos.coords.longitude, time: new Date().toISOString() });
+                        polyline.addLatLng(coords);
+                        userMarker.setLatLng(coords).addTo(map);
+                        map.setView(coords, 16);
+                        document.getElementById('status').innerHTML = `🏃 ${positions.length} pts (v2.7.3)`;
                     }
-                };
-
-                if (window.Capacitor && Capacitor.Plugins.Geolocation) {
-                    watchId = await Capacitor.Plugins.Geolocation.watchPosition(trackOptions, onPos);
-                } else {
-                    watchId = navigator.geolocation.watchPosition(onPos, (e) => alert("Erreur GPS"), trackOptions);
-                }
-            } catch (err) { alert("Erreur : " + err.message); }
+                });
+            } catch (err) { alert(err.message); }
         }
 
         async function stopTracking() {
             if (watchId) {
-                if (window.Capacitor && Capacitor.Plugins.Geolocation) {
-                    await Capacitor.Plugins.Geolocation.clearWatch({ id: watchId });
-                } else {
-                    navigator.geolocation.clearWatch(watchId);
-                }
+                await Capacitor.Plugins.Geolocation.clearWatch({ id: watchId });
+                if (window.Capacitor && Capacitor.Plugins.KeepAwake) await Capacitor.Plugins.KeepAwake.allowSleep();
                 watchId = null;
-                await toggleWakeLock(false);
-                document.getElementById('status').innerHTML = "🛑 Tracé stoppé <span class='version-badge'>v2.7.1</span>";
+                document.getElementById('status').innerHTML = "🛑 Stoppé (v2.7.3)";
             }
         }
 
         async function exportGPX() {
-            if (positions.length < 2) return alert("Pas assez de points pour l'export.");
-            let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="TraceurPro"><trk><trkseg>`;
+            if (positions.length < 2) return;
+            let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"><trk><trkseg>`;
             positions.forEach(p => gpx += `<trkpt lat="${p.lat}" lon="${p.lng}"><time>${p.time}</time></trkpt>`);
             gpx += `</trkseg></trk></gpx>`;
-
-            if (window.Capacitor && Capacitor.Plugins.Share) {
-                await Capacitor.Plugins.Share.share({ title: 'Mon parcours', text: gpx, dialogTitle: 'Exporter le fichier GPX' });
-            } else {
-                const blob = new Blob([gpx], { type: 'application/gpx+xml' });
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = `parcours_${new Date().getTime()}.gpx`;
-                a.click();
-            }
+            await Capacitor.Plugins.Share.share({ title: 'Mon parcours v2.7.3', text: gpx });
         }
     </script>
 </body>
