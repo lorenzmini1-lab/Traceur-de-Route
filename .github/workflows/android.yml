@@ -1,4 +1,4 @@
-name: Build Android APK (v2.6 - GPS FIX)
+name: Build Android APK (v2.7 - GPS FIX)
 
 on:
   push:
@@ -43,10 +43,10 @@ jobs:
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
           sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
 
-      - name: Mise à jour version (v2.6)
+      - name: Mise à jour version (v2.7)
         run: |
           sed -i 's/versionCode [0-9]*/versionCode 11/' android/app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "2.6"/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "2.7"/' android/app/build.gradle
 
       - name: Configuration Java & SDK
         uses: actions/setup-java@v4
@@ -66,7 +66,7 @@ jobs:
       - name: Déploiement
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          echo '{"version": "2.6", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
+          echo '{"version": "2.7", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
       - name: Push sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
