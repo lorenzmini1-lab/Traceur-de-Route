@@ -1,4 +1,4 @@
-name: Build Android APK (v2.7.1 - Final)
+name: Build Android APK (v2.7.2 - Icon Fix)
 
 on:
   push:
@@ -11,67 +11,67 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout du code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Installation Propre
+      - name: Install
         run: |
           mkdir -p www
-          # On utilise legacy-peer-deps pour ignorer les conflits de version mineurs
-          npm install --legacy-peer-deps
+          npm install --force
 
-      - name: Initialisation Capacitor
+      - name: Initialisation
         run: |
-          # Nettoyage total pour éviter l'erreur "platform already exists"
           rm -rf android
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Correction Manifeste et Versions
+      - name: Force Icon Generation
         run: |
-          # On attend que Capacitor ait fini d'écrire les fichiers
-          sleep 3
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          GRADLE="android/app/build.gradle"
-          
-          # Injection des permissions GPS et Anti-Veille
-          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
-          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
-          
-          # Mise à jour versionCode 21 et versionName 2.7.1
-          sed -i 's/versionCode [0-9]*/versionCode 21/' $GRADLE
-          sed -i 's/versionName "[^"]*"/versionName "2.7.1"/' $GRADLE
-
-      - name: Génération de l'icône Mappemonde
-        run: |
+          # On installe l'outil de génération spécifiquement
+          npm install @capacitor/assets --save-dev
           if [ -f "icon.png" ]; then
+            # On force la génération même si les dossiers n'existent pas
             npx capacitor-assets generate --android
+          else
+            echo "ERREUR : icon.png est introuvable à la racine !"
+            exit 1
           fi
 
-      - name: Setup Java 17
+      - name: Permissions & Version (2.7.2)
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          GRADLE="android/app/build.gradle"
+          # On injecte les permissions
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
+          # On monte d'un cran : versionCode 22
+          sed -i 's/versionCode [0-9]*/versionCode 22/' $GRADLE
+          sed -i 's/versionName "[^"]*"/versionName "2.7.2"/' $GRADLE
+
+      - name: Java & Build
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build Final APK
+      - name: Finalize
         run: |
           npx cap sync android
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Exportation
+      - name: Deploy
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          echo '{"version": "2.7.1", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
+          echo '{"version": "2.7.2", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
-      - name: Déploiement GitHub Pages
+      - name: Push
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
