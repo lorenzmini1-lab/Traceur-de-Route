@@ -1,4 +1,4 @@
-name: Build Android APK (v2.6.2 - Manifest Manuel)
+name: Build Android APK (v2.7.1 - Manifest Manuel)
 
 on:
   push:
@@ -44,8 +44,8 @@ jobs:
       - name: Mise à jour VersionCode
         run: |
           # Passage au code 14 pour forcer la mise à jour
-          sed -i 's/versionCode [0-9]*/versionCode 15/' android/app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "2.6.2"/' android/app/build.gradle
+          sed -i 's/versionCode [0-9]*/versionCode 14/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "2.7.1"/' android/app/build.gradle
 
       - name: Configuration Java & SDK
         uses: actions/setup-java@v4
@@ -66,7 +66,7 @@ jobs:
       - name: Déploiement
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          echo '{"version": "2.6.2", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
+          echo '{"version": "2.7.1", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
       - name: Push sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
