@@ -1,4 +1,4 @@
-name: Build Android APK (v2.7.6 - Force JSON)
+name: Build Android APK (v2.7.8)
 
 on:
   push:
@@ -22,53 +22,45 @@ jobs:
       - name: Install
         run: |
           mkdir -p www
+          # On installe uniquement l'essentiel pour éviter les erreurs ERESOLVE
           npm install --force
-          npm install @capacitor/assets --save-dev --force
 
-      - name: Initialisation
+      - name: Init Capacitor
         run: |
           rm -rf android
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Icon Generation (v2.7.6)
-        run: |
-          if [ -f "icon.png" ]; then
-            rm -rf android/app/src/main/res/mipmap-*
-            npx capacitor-assets generate --android
-          fi
-
-      - name: Permissions & Versioning (v2.7.6)
+      - name: Config Android (v2.7.8)
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           GRADLE="android/app/build.gradle"
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
-          # On passe au versionCode 26
-          sed -i 's/versionCode [0-9]*/versionCode 26/' $GRADLE
-          sed -i 's/versionName "[^"]*"/versionName "2.7.6"/' $GRADLE
+          # On monte le versionCode à 28
+          sed -i 's/versionCode [0-9]*/versionCode 28/' $GRADLE
+          sed -i 's/versionName "[^"]*"/versionName "2.7.8"/' $GRADLE
 
-      - name: Java & Build
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Finalize & Build
+      - name: Build APK
         run: |
           npx cap sync android
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Create Version JSON (v2.7.6 - Anti-Cache)
+      - name: Finalize & Version JSON
         run: |
-          # On génère un JSON unique avec l'heure du build pour forcer la mise à jour
-          TIMESTAMP=$(date +%s)
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          echo "{\"version\": \"2.7.6\", \"url\": \"https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk\", \"build\": \"$TIMESTAMP\"}" > version.json
+          # On ajoute un ID unique pour forcer la mise à jour du fichier version.json
+          echo "{\"version\": \"2.7.8\", \"url\": \"https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk\", \"id\": \"$(date +%s)\"}" > version.json
 
-      - name: Push to GH-Pages
+      - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
