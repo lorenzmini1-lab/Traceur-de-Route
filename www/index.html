@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Traceur GPS Pro v2.7</title>
+    <title>Traceur GPS Pro v2.6.2</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { box-sizing: border-box; }
@@ -28,7 +28,7 @@
             <button class="btn-stop" onclick="stopTracking()">Arrêt</button>
             <button class="btn-export" onclick="exportGPX()">Export</button>
         </div>
-        <div id="status">Statut : Prêt <span class="version-badge">v2.7</span></div>
+        <div id="status">Statut : Prêt <span class="version-badge">v2.6.2</span></div>
         <div id="map"></div>
     </div>
 
@@ -36,7 +36,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        const CURRENT_LOCAL_VERSION = "2.7";
+        const CURRENT_LOCAL_VERSION = "2.6.2";
         let positions = []; 
         let watchId = null;
         let map, polyline, userMarker;
@@ -73,7 +73,7 @@
             if (!map.hasLayer(userMarker)) userMarker.addTo(map);
             map.setView(newCoords, 16);
             
-            document.getElementById('status').innerHTML = `🏃 ${positions.length} pts enregistrés <span class='version-badge'>v2.7</span>`;
+            document.getElementById('status').innerHTML = `🏃 ${positions.length} pts enregistrés <span class='version-badge'>v2.6.2</span>`;
         }
 
         async function startTracking() {
@@ -93,7 +93,7 @@
             // 2. Bloquer l'écran pour qu'il reste allumé
             await toggleWakeLock(true);
 
-            document.getElementById('status').innerHTML = "📍 Recherche GPS... <span class='version-badge'>v2.7</span>";
+            document.getElementById('status').innerHTML = "📍 Recherche GPS... <span class='version-badge'>v2.6.2</span>";
             
             // 3. Lancer le suivi avec le plugin Geolocation (plus stable)
             if (window.Capacitor && Capacitor.Plugins.Geolocation) {
@@ -127,7 +127,7 @@
                 watchId = null;
                 // On autorise à nouveau l'écran à s'éteindre
                 toggleWakeLock(false);
-                document.getElementById('status').innerHTML = "🛑 Suivi stoppé <span class='version-badge'>v2.7</span>";
+                document.getElementById('status').innerHTML = "🛑 Suivi stoppé <span class='version-badge'>v2.6.2</span>";
             }
         }
 
