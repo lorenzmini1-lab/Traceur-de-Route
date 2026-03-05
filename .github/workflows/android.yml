@@ -1,4 +1,4 @@
-name: Build Android APK (v2.6.2 - Correction)
+name: Build Android APK (v2.6.2 - Final Fix)
 
 on:
   push:
@@ -23,29 +23,34 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets @capacitor-community/keep-awake @capacitor/geolocation
           
-      - name: Initialiser Capacitor
+      - name: Initialiser le projet Android
         run: |
-          # On crée le dossier SEULEMENT s'il n'existe pas sur ton GitHub
-          if [ ! -d "android" ]; then
-            npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
-            npx cap add android
+          # On s'assure que le dossier www existe (requis par Capacitor)
+          mkdir -p www
+          # On initialise Capacitor et on ajoute la plateforme Android
+          npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
+          npx cap add android
+
+      - name: Correction et Versioning
+        run: |
+          # On attend 2 secondes pour être sûr que le système de fichiers est prêt
+          sleep 2
+          GRADLE="android/app/build.gradle"
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+
+          if [ -f "$GRADLE" ]; then
+            # Mise à jour versionCode 15
+            sed -i 's/versionCode [0-9]*/versionCode 15/' $GRADLE
+            sed -i 's/versionName "[^"]*"/versionName "2.6.2"/' $GRADLE
           fi
 
-      - name: Mise à jour Version et Manifeste
-        run: |
-          # Maintenant que le dossier existe, on peut modifier les fichiers
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          GRADLE="android/app/build.gradle"
-          
-          # 1. Versioning (Code 14)
-          sed -i 's/versionCode [0-9]*/versionCode 14/' $GRADLE
-          sed -i 's/versionName "[^"]*"/versionName "2.6.2"/' $GRADLE
-          
-          # 2. Injection des permissions GPS si elles manquent
-          if ! grep -q "ACCESS_FINE_LOCATION" "$MANIFEST"; then
+          if [ -f "$MANIFEST" ]; then
+            # Injection forcée des permissions et de l'icône
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
             sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
+            sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@mipmap\/icon"/' $MANIFEST
+            sed -i 's/android:roundIcon="@mipmap\/ic_launcher_round"/android:roundIcon="@mipmap\/icon"/' $MANIFEST
           fi
 
       - name: Générer les Icônes
