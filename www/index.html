@@ -62,36 +62,68 @@
             } catch (e) { console.warn("WakeLock non supporté"); }
         }
 
-        function startTracking() {
-            if (watchId) return;
+        // --- NOUVEAU : Fonction de mise à jour de la carte ---
+        function handleNewPosition(lat, lng) {
+            const timestamp = new Date().toISOString();
+            const newCoords = [lat, lng];
+
+            positions.push({ lat, lng, timestamp });
+            polyline.addLatLng(newCoords);
+            userMarker.setLatLng(newCoords);
+            if (!map.hasLayer(userMarker)) userMarker.addTo(map);
+            map.setView(newCoords, 16);
             
-            // On bloque l'écran pour qu'il reste allumé
-            toggleWakeLock(true);
+            document.getElementById('status').innerHTML = `🏃 ${positions.length} pts enregistrés <span class='version-badge'>v2.6</span>`;
+        }
+
+        async function startTracking() {
+            if (watchId) return;
+
+            // 1. Demander explicitement la permission de position (Pour Android)
+            if (window.Capacitor && Capacitor.Plugins.Geolocation) {
+                try {
+                    const permissions = await Capacitor.Plugins.Geolocation.requestPermissions();
+                    if (permissions.location !== 'granted') {
+                        alert("Permission GPS refusée. Active-la dans les réglages de ton téléphone.");
+                        return;
+                    }
+                } catch (e) { console.error("Erreur permissions", e); }
+            }
+            
+            // 2. Bloquer l'écran pour qu'il reste allumé
+            await toggleWakeLock(true);
 
             document.getElementById('status').innerHTML = "📍 Recherche GPS... <span class='version-badge'>v2.6</span>";
             
-            watchId = navigator.geolocation.watchPosition(
-                (pos) => {
-                    const { latitude, longitude } = pos.coords;
-                    const timestamp = new Date().toISOString();
-                    const newCoords = [latitude, longitude];
-
-                    positions.push({ lat: latitude, lng: longitude, timestamp });
-                    polyline.addLatLng(newCoords);
-                    userMarker.setLatLng(newCoords);
-                    if (!map.hasLayer(userMarker)) userMarker.addTo(map);
-                    map.setView(newCoords, 16);
-                    
-                    document.getElementById('status').innerHTML = `🏃 ${positions.length} pts enregistrés <span class='version-badge'>v2.6</span>`;
-                },
-                (err) => alert("Erreur GPS. Vérifie tes permissions."),
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
+            // 3. Lancer le suivi avec le plugin Geolocation (plus stable)
+            if (window.Capacitor && Capacitor.Plugins.Geolocation) {
+                watchId = await Capacitor.Plugins.Geolocation.watchPosition(
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+                    (pos, err) => {
+                        if (err) {
+                            console.error("Erreur GPS Plugin:", err);
+                            return;
+                        }
+                        handleNewPosition(pos.coords.latitude, pos.coords.longitude);
+                    }
+                );
+            } else {
+                // Fallback navigateur classique
+                watchId = navigator.geolocation.watchPosition(
+                    (pos) => handleNewPosition(pos.coords.latitude, pos.coords.longitude),
+                    (err) => alert("Erreur GPS Navigateur. Vérifie tes permissions."),
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            }
         }
 
-        function stopTracking() {
+        async function stopTracking() {
             if (watchId) {
-                navigator.geolocation.clearWatch(watchId);
+                if (window.Capacitor && Capacitor.Plugins.Geolocation) {
+                    await Capacitor.Plugins.Geolocation.clearWatch({ id: watchId });
+                } else {
+                    navigator.geolocation.clearWatch(watchId);
+                }
                 watchId = null;
                 // On autorise à nouveau l'écran à s'éteindre
                 toggleWakeLock(false);
@@ -111,12 +143,8 @@
                 if (window.Capacitor && Capacitor.Plugins.Share) {
                     await Capacitor.Plugins.Share.share({ 
                         title: 'Mon Trajet', 
-                        text: 'Voici mon tracé GPX', 
-                        url: '', // On peut laisser vide
-                        dialogTitle: 'Partager le fichier GPX',
-                        // Note: Pour envoyer un vrai fichier, il faudrait FileSystem. 
-                        // Ici on partage le texte GPX directement.
-                        files: [] 
+                        text: gpx, 
+                        dialogTitle: 'Partager le fichier GPX'
                     });
                 } else {
                     const blob = new Blob([gpx], { type: 'application/gpx+xml' });
