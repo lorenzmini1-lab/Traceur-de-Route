@@ -1,4 +1,4 @@
-name: Build Android APK (v2.6 - Icônes, GPX et WakeLock)
+name: Build Android APK (v2.6 - GPS FIX)
 
 on:
   push:
@@ -21,38 +21,31 @@ jobs:
 
       - name: Installer les outils
         run: |
-          # Ajout de @capacitor/geolocation pour corriger l'autorisation de position
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets @capacitor-community/keep-awake @capacitor/geolocation
           
-      - name: Générer les Icônes (Mappemonde)
+      - name: Générer les Icônes
         run: |
           if [ -f "icon.png" ]; then
             npx capacitor-assets generate --android
-          else
-            echo "ERREUR : icon.png est introuvable !"
-            exit 1
           fi
 
-      - name: Initialiser Capacitor
+      - name: Créer le projet Android
         run: |
-          if [ ! -d "android" ]; then
-            npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
-            npx cap add android
-          fi
+          # On crée le dossier android que tu n'as pas
+          npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
+          npx cap add android
 
-      - name: Configuration des Permissions Android (GPS)
+      - name: Injection des permissions GPS
         run: |
-          # On force l'ajout des permissions GPS dans le fichier AndroidManifest
+          # Comme tu n'as pas de manifeste, on demande au robot de modifier celui qu'il vient de créer
           MANIFEST="android/app/src/main/AndroidManifest.xml"
-          if [ -f "$MANIFEST" ]; then
-            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
-            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
-          fi
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
+          sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
 
-      - name: Mise à jour de la version (v2.6)
+      - name: Mise à jour version (v2.6)
         run: |
-          # Passage au code 10 pour être sûr qu'Android voit le changement
-          sed -i 's/versionCode [0-9]*/versionCode 10/' android/app/build.gradle
+          sed -i 's/versionCode [0-9]*/versionCode 11/' android/app/build.gradle
           sed -i 's/versionName "[^"]*"/versionName "2.6"/' android/app/build.gradle
 
       - name: Configuration Java & SDK
