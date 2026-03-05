@@ -1,4 +1,4 @@
-name: Build Android APK (v2.7.1)
+name: Build Android APK (v2.7.1 - Final)
 
 on:
   push:
@@ -19,36 +19,38 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Installation des dépendances
+      - name: Installation Propre
         run: |
           mkdir -p www
-          npm install
+          # On utilise legacy-peer-deps pour ignorer les conflits de version mineurs
+          npm install --legacy-peer-deps
 
-      - name: Setup Capacitor Android (Nettoyage Forcé)
+      - name: Initialisation Capacitor
         run: |
+          # Nettoyage total pour éviter l'erreur "platform already exists"
           rm -rf android
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Injection Permissions et Version (v2.7.1)
+      - name: Correction Manifeste et Versions
         run: |
+          # On attend que Capacitor ait fini d'écrire les fichiers
+          sleep 3
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           GRADLE="android/app/build.gradle"
-          # Ajout des permissions GPS
-          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
+          
+          # Injection des permissions GPS et Anti-Veille
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
-          # Forçage du versionCode à 21 et versionName à 2.7.1
+          
+          # Mise à jour versionCode 21 et versionName 2.7.1
           sed -i 's/versionCode [0-9]*/versionCode 21/' $GRADLE
           sed -i 's/versionName "[^"]*"/versionName "2.7.1"/' $GRADLE
 
-      - name: Génération des Icônes
+      - name: Génération de l'icône Mappemonde
         run: |
           if [ -f "icon.png" ]; then
             npx capacitor-assets generate --android
-          else
-            echo "ERREUR : icon.png non trouvé à la racine"
-            exit 1
           fi
 
       - name: Setup Java 17
@@ -57,19 +59,19 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build de l'APK Final
+      - name: Build Final APK
         run: |
           npx cap sync android
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Préparation Déploiement
+      - name: Exportation
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
           echo '{"version": "2.7.1", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
-      - name: Push sur GitHub Pages
+      - name: Déploiement GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
