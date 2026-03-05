@@ -1,4 +1,4 @@
-name: Build Android APK (v2.7.2 - Icon Fix)
+name: Build Android APK (v2.7.2 - Icon Force)
 
 on:
   push:
@@ -32,13 +32,12 @@ jobs:
 
       - name: Force Icon Generation
         run: |
-          # On installe l'outil de génération spécifiquement
-          npm install @capacitor/assets --save-dev
+          # ICI : On ajoute --force pour débloquer l'étape rouge de ta capture
+          npm install @capacitor/assets --save-dev --force
           if [ -f "icon.png" ]; then
-            # On force la génération même si les dossiers n'existent pas
             npx capacitor-assets generate --android
           else
-            echo "ERREUR : icon.png est introuvable à la racine !"
+            echo "ERREUR : icon.png manquant !"
             exit 1
           fi
 
@@ -46,10 +45,8 @@ jobs:
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           GRADLE="android/app/build.gradle"
-          # On injecte les permissions
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
-          # On monte d'un cran : versionCode 22
           sed -i 's/versionCode [0-9]*/versionCode 22/' $GRADLE
           sed -i 's/versionName "[^"]*"/versionName "2.7.2"/' $GRADLE
 
