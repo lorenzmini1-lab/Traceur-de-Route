@@ -4,7 +4,10 @@
   "webDir": "www",
   "bundledWebRuntime": false,
   "android": {
-    "allowMixedContent": true
+    "allowMixedContent": true,
+    "buildOptions": {
+      "releaseType": "debug"
+    }
   },
   "plugins": {
     "Geolocation": {
@@ -12,6 +15,11 @@
     },
     "KeepAwake": {
       "copyAndroidResources": true
+    },
+    "Share": {
+      "android": {
+        "text": "Voici mon tracé GPX"
+      }
     }
   }
 }
