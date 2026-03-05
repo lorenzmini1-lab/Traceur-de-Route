@@ -1,4 +1,4 @@
-name: Build Android APK (v2.7.0 - Force Update)
+name: Build Android APK (v2.7.0 - Stabilisation)
 
 on:
   push:
@@ -23,37 +23,36 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets @capacitor-community/keep-awake @capacitor/geolocation
           
-      - name: Initialiser le projet Android (Nettoyage Forcé)
+      - name: Initialiser ou Réparer le dossier Android
         run: |
           mkdir -p www
-          # Suppression de l'ancien dossier pour éviter l'erreur "already exists"
+          # Si le dossier existe, on le supprime pour repartir sur une base 100% neuve
           rm -rf android
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Correction et Versioning (v2.7.0)
+      - name: Correction du Manifeste et Version (v2.7.0)
         run: |
+          # On définit les chemins des fichiers générés
           GRADLE="android/app/build.gradle"
           MANIFEST="android/app/src/main/AndroidManifest.xml"
 
-          if [ -f "$GRADLE" ]; then
-            # On passe au code 17 pour forcer la mise à jour système
-            sed -i 's/versionCode [0-9]*/versionCode 17/' $GRADLE
-            sed -i 's/versionName "[^"]*"/versionName "2.7.0"/' $GRADLE
-          fi
-
-          if [ -f "$MANIFEST" ]; then
-            # Ré-injection des permissions indispensables
-            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
-            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
-            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
-            # Force l'utilisation de la nouvelle icône mappemonde
-            sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@mipmap\/icon"/' $MANIFEST
-            sed -i 's/android:roundIcon="@mipmap\/ic_launcher_round"/android:roundIcon="@mipmap\/icon"/' $MANIFEST
-          fi
+          # Mise à jour du versionCode à 17 pour écraser toute ancienne version
+          sed -i 's/versionCode [0-9]*/versionCode 17/' $GRADLE
+          sed -i 's/versionName "[^"]*"/versionName "2.7.0"/' $GRADLE
+          
+          # Injection des permissions dans le Manifeste
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
+          
+          # Forçage de l'icône mappemonde
+          sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@mipmap\/icon"/' $MANIFEST
+          sed -i 's/android:roundIcon="@mipmap\/ic_launcher_round"/android:roundIcon="@mipmap\/icon"/' $MANIFEST
 
       - name: Générer les Icônes
         run: |
+          # Utilisation de ton image 1024x1024
           if [ -f "icon.png" ]; then
             npx capacitor-assets generate --android
           fi
