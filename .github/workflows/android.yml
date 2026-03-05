@@ -1,4 +1,4 @@
-name: Build Android APK (v2.6.1 - Force Icon & GPS)
+name: Build Android APK (v2.6.2 - Manifest Manuel)
 
 on:
   push:
@@ -21,40 +21,31 @@ jobs:
 
       - name: Installer les outils
         run: |
-          # Installation de tous les modules nécessaires
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets @capacitor-community/keep-awake @capacitor/geolocation
           
-      - name: Générer les Icônes (Mappemonde)
+      - name: Générer les Icônes (Mappemonde 1024x1024)
         run: |
           if [ -f "icon.png" ]; then
-            # Génération forcée des ressources Android à partir de ton image
+            # Cette commande va créer les fichiers dans android/app/src/main/res/mipmap
             npx capacitor-assets generate --android
           else
-            echo "ERREUR : icon.png est introuvable à la racine !"
+            echo "ERREUR : icon.png (1024x1024) introuvable !"
             exit 1
           fi
 
-      - name: Créer le projet Android
+      - name: Préparer Capacitor
         run: |
-          npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
-          npx cap add android
+          # On ne fait pas "npx cap add android" si le dossier existe déjà
+          if [ ! -d "android" ]; then
+            npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
+            npx cap add android
+          fi
 
-      - name: Correction du Manifeste (Icône et GPS)
+      - name: Mise à jour VersionCode
         run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          # 1. Injection des permissions GPS
-          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
-          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
-          
-          # 2. Force l'utilisation de l'icône générée au lieu du logo Capacitor par défaut
-          sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@mipmap\/icon"/' $MANIFEST
-          sed -i 's/android:roundIcon="@mipmap\/ic_launcher_round"/android:roundIcon="@mipmap\/icon"/' $MANIFEST
-
-      - name: Mise à jour de la version (v2.6.1)
-        run: |
-          # versionCode 13 pour forcer la mise à jour visuelle sur ton tel
-          sed -i 's/versionCode [0-9]*/versionCode 13/' android/app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "2.6.1"/' android/app/build.gradle
+          # Passage au code 14 pour forcer la mise à jour
+          sed -i 's/versionCode [0-9]*/versionCode 14/' android/app/build.gradle
+          sed -i 's/versionName "[^"]*"/versionName "2.6.2"/' android/app/build.gradle
 
       - name: Configuration Java & SDK
         uses: actions/setup-java@v4
@@ -68,13 +59,14 @@ jobs:
       - name: Build APK Final
         run: |
           cd android
+          # On s'assure que le gradlew est exécutable
           chmod +x gradlew
           ./gradlew assembleDebug
 
       - name: Déploiement
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          echo '{"version": "2.6.1", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
+          echo '{"version": "2.6.2", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
       - name: Push sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
