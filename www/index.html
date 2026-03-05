@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Traceur GPS v2.7.8</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { box-sizing: border-box; touch-action: manipulation; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #2c3e50; font-family: sans-serif; }
+        .app-container { display: flex; flex-direction: column; height: 100vh; }
+        .header-info { background: #1a252f; color: #3498db; text-align: center; padding: 5px; font-size: 0.8em; font-weight: bold; }
+        .controls { padding: 12px; background: #2c3e50; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; z-index: 1000; }
+        button { padding: 15px 5px; border: none; border-radius: 12px; font-weight: bold; color: white; text-transform: uppercase; font-size: 0.85em; cursor: pointer; }
+        .btn-start { background: #27ae60; }
+        .btn-stop { background: #e74c3c; }
+        .btn-export { background: #3498db; }
+        #status { font-size: 0.9em; text-align: center; background: #1a252f; padding: 10px; color: #ecf0f1; border-bottom: 1px solid #34495e; }
+        #map { flex: 1; width: 100%; z-index: 1; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="header-info">TRACEUR DE ROUTE - v2.7.8</div>
+        <div class="controls">
+            <button class="btn-start" onclick="startTracking()">Départ</button>
+            <button class="btn-stop" onclick="stopTracking()">Arrêt</button>
+            <button class="btn-export" onclick="exportGPX()">Export</button>
+        </div>
+        <div id="status">Prêt (v2.7.8)</div>
+        <div id="map"></div>
+    </div>
+
+    <script src="capacitor.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let positions = []; 
+        let watchId = null;
+        let map, polyline;
+
+        map = L.map('map', { zoomControl: false, attributionControl: false }).setView([46.6, 1.8], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        polyline = L.polyline([], {color: '#e74c3c', weight: 6}).addTo(map);
+
+        async function startTracking() {
+            if (watchId) return;
+            try {
+                if (window.Capacitor) {
+                    await Capacitor.Plugins.Geolocation.requestPermissions();
+                }
+                document.getElementById('status').innerText = "📍 GPS Actif (v2.7.8)";
+                watchId = await Capacitor.Plugins.Geolocation.watchPosition({ enableHighAccuracy: true }, (pos) => {
+                    if (pos) {
+                        const coords = [pos.coords.latitude, pos.coords.longitude];
+                        positions.push({ lat: pos.coords.latitude, lng: pos.coords.longitude, time: new Date().toISOString() });
+                        polyline.addLatLng(coords);
+                        map.setView(coords, 16);
+                        document.getElementById('status').innerText = `🏃 ${positions.length} pts (v2.7.8)`;
+                    }
+                });
+            } catch (err) { alert(err.message); }
+        }
+
+        async function stopTracking() {
+            if (watchId) {
+                await Capacitor.Plugins.Geolocation.clearWatch({ id: watchId });
+                watchId = null;
+                document.getElementById('status').innerText = "🛑 Stoppé (v2.7.8)";
+            }
+        }
+
+        async function exportGPX() {
+            if (positions.length < 2) return alert("Pas assez de points.");
+            
+            let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>`;
+            positions.forEach(p => gpx += `<trkpt lat="${p.lat}" lon="${p.lng}"><time>${p.time}</time></trkpt>`);
+            gpx += `</trkseg></trk></gpx>`;
+
+            try {
+                if (window.Capacitor && Capacitor.Plugins.Share) {
+                    // ASTUCE : On crée un lien de données (Data URI)
+                    // On précise bien le type 'application/gpx+xml'
+                    const base64Data = btoa(unescape(encodeURIComponent(gpx)));
+                    
+                    await Capacitor.Plugins.Share.share({
+                        title: 'Parcours GPS v2.7.8',
+                        url: 'data:application/gpx+xml;base64,' + base64Data,
+                        dialogTitle: 'Enregistrer le fichier GPX'
+                    });
+                } else {
+                    // Fallback navigateur PC
+                    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = "parcours.gpx";
+                    a.click();
+                }
+            } catch (err) { alert("Erreur : " + err.message); }
+        }
+    </script>
+</body>
+</html>
