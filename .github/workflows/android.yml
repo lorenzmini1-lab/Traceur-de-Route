@@ -11,56 +11,64 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout
+      - name: Checkout du code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Configuration Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install
+      - name: Installation des dépendances
         run: |
           mkdir -p www
-          # On installe uniquement l'essentiel pour éviter les erreurs ERESOLVE
           npm install --force
 
-      - name: Init Capacitor
+      - name: Initialisation Capacitor
         run: |
           rm -rf android
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Config Android (v2.7.8)
+      - name: Configuration de la Version (v2.7.8)
         run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
           GRADLE="android/app/build.gradle"
-          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
-          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
-          # On monte le versionCode à 28
+          # On définit le versionCode à 28 pour la version 2.7.8
           sed -i 's/versionCode [0-9]*/versionCode 28/' $GRADLE
           sed -i 's/versionName "[^"]*"/versionName "2.7.8"/' $GRADLE
+          
+          # Permissions GPS et Mise en veille
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
 
-      - name: Setup Java
+      - name: Installation Java
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Build APK
+      - name: Build de l'APK
         run: |
           npx cap sync android
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Finalize & Version JSON
+      - name: MISE À JOUR AUTOMATIQUE DU VERSION.JSON (v2.7.8)
         run: |
+          # On prépare l'APK pour le téléchargement
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          # On ajoute un ID unique pour forcer la mise à jour du fichier version.json
-          echo "{\"version\": \"2.7.8\", \"url\": \"https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk\", \"id\": \"$(date +%s)\"}" > version.json
+          
+          # On génère le fichier version.json dynamiquement
+          # Le champ "update_id" change à chaque build pour forcer le rafraîchissement du cache
+          echo "{" > version.json
+          echo "  \"version\": \"2.7.8\"," >> version.json
+          echo "  \"url\": \"https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk\"," >> version.json
+          echo "  \"update_id\": \"$(date +%s)\"" >> version.json
+          echo "}" >> version.json
 
-      - name: Deploy
+      - name: Déploiement sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
