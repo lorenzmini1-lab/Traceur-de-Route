@@ -1,4 +1,4 @@
-name: Build Android APK (v2.7.1 - Manifest Manuel)
+name: Build Android APK (v2.6.2 - Correction)
 
 on:
   push:
@@ -23,29 +23,36 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/share @capacitor/assets @capacitor-community/keep-awake @capacitor/geolocation
           
-      - name: Générer les Icônes (Mappemonde 1024x1024)
+      - name: Initialiser Capacitor
         run: |
-          if [ -f "icon.png" ]; then
-            # Cette commande va créer les fichiers dans android/app/src/main/res/mipmap
-            npx capacitor-assets generate --android
-          else
-            echo "ERREUR : icon.png (1024x1024) introuvable !"
-            exit 1
-          fi
-
-      - name: Préparer Capacitor
-        run: |
-          # On ne fait pas "npx cap add android" si le dossier existe déjà
+          # On crée le dossier SEULEMENT s'il n'existe pas sur ton GitHub
           if [ ! -d "android" ]; then
             npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
             npx cap add android
           fi
 
-      - name: Mise à jour VersionCode
+      - name: Mise à jour Version et Manifeste
         run: |
-          # Passage au code 14 pour forcer la mise à jour
-          sed -i 's/versionCode [0-9]*/versionCode 14/' android/app/build.gradle
-          sed -i 's/versionName "[^"]*"/versionName "2.7.1"/' android/app/build.gradle
+          # Maintenant que le dossier existe, on peut modifier les fichiers
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          GRADLE="android/app/build.gradle"
+          
+          # 1. Versioning (Code 14)
+          sed -i 's/versionCode [0-9]*/versionCode 14/' $GRADLE
+          sed -i 's/versionName "[^"]*"/versionName "2.6.2"/' $GRADLE
+          
+          # 2. Injection des permissions GPS si elles manquent
+          if ! grep -q "ACCESS_FINE_LOCATION" "$MANIFEST"; then
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
+            sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
+          fi
+
+      - name: Générer les Icônes
+        run: |
+          if [ -f "icon.png" ]; then
+            npx capacitor-assets generate --android
+          fi
 
       - name: Configuration Java & SDK
         uses: actions/setup-java@v4
@@ -59,14 +66,13 @@ jobs:
       - name: Build APK Final
         run: |
           cd android
-          # On s'assure que le gradlew est exécutable
           chmod +x gradlew
           ./gradlew assembleDebug
 
       - name: Déploiement
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
-          echo '{"version": "2.7.1", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
+          echo '{"version": "2.6.2", "url": "https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk"}' > version.json
 
       - name: Push sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
