@@ -5,5 +5,13 @@
   "bundledWebRuntime": false,
   "android": {
     "allowMixedContent": true
+  },
+  "plugins": {
+    "Geolocation": {
+      "forceWebView": false
+    },
+    "KeepAwake": {
+      "copyAndroidResources": true
+    }
   }
 }
