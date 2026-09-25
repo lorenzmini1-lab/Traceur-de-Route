@@ -3,100 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Traceur GPS v2.7.8</title>
+    <title>Traceur GPS Pro v2.8.0</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { box-sizing: border-box; touch-action: manipulation; }
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #2c3e50; font-family: sans-serif; }
-        .app-container { display: flex; flex-direction: column; height: 100vh; }
+        .app-container { display: flex; flex-direction: column; height: 100vh; position: relative; }
         .header-info { background: #1a252f; color: #3498db; text-align: center; padding: 5px; font-size: 0.8em; font-weight: bold; }
-        .controls { padding: 12px; background: #2c3e50; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; z-index: 1000; }
-        button { padding: 15px 5px; border: none; border-radius: 12px; font-weight: bold; color: white; text-transform: uppercase; font-size: 0.85em; cursor: pointer; }
+        
+        /* Dashboard télémétrie */
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr 1fr; background: #34495e; color: white; text-align: center; padding: 8px 5px; border-bottom: 2px solid #2c3e50; }
+        .dash-item { display: flex; flex-direction: column; }
+        .dash-value { font-size: 1.1em; font-weight: bold; color: #2ecc71; }
+        .dash-label { font-size: 0.65em; text-transform: uppercase; opacity: 0.8; }
+        
+        .controls { padding: 10px; background: #2c3e50; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; z-index: 1000; }
+        button { padding: 12px 2px; border: none; border-radius: 8px; font-weight: bold; color: white; text-transform: uppercase; font-size: 0.75em; cursor: pointer; }
         .btn-start { background: #27ae60; }
         .btn-stop { background: #e74c3c; }
+        .btn-stop-btn { background: #f39c12; }
         .btn-export { background: #3498db; }
-        #status { font-size: 0.9em; text-align: center; background: #1a252f; padding: 10px; color: #ecf0f1; border-bottom: 1px solid #34495e; }
+        
+        #status { font-size: 0.85em; text-align: center; background: #1a252f; padding: 8px; color: #ecf0f1; border-bottom: 1px solid #34495e; }
         #map { flex: 1; width: 100%; z-index: 1; }
+
+        /* Bouton de recentrage */
+        #btnRecenter { position: absolute; bottom: 20px; right: 20px; z-index: 1000; background: #1a252f; color: #3498db; border: 2px solid #3498db; padding: 10px 15px; border-radius: 20px; font-weight: bold; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
     <div class="app-container">
-        <div class="header-info">TRACEUR DE ROUTE - v2.7.8</div>
-        <div class="controls">
-            <button class="btn-start" onclick="startTracking()">Départ</button>
-            <button class="btn-stop" onclick="stopTracking()">Arrêt</button>
-            <button class="btn-export" onclick="exportGPX()">Export</button>
+        <div class="header-info">TRACEUR DE ROUTE - BUS v2.8.0</div>
+        
+        <!-- Dashboard en temps réel -->
+        <div class="dashboard">
+            <div class="dash-item"><span id="valSpeed" class="dash-value">0 km/h</span><span class="dash-label">Vitesse</span></div>
+            <div class="dash-item"><span id="valDist" class="dash-value">0.0 km</span><span class="dash-label">Distance</span></div>
+            <div class="dash-item"><span id="valAcc" class="dash-value">-- m</span><span class="dash-label">Précision</span></div>
         </div>
-        <div id="status">Prêt (v2.7.8)</div>
+
+        <div class="controls">
+            <button id="btnStart" class="btn-start" onclick="startTracking()">Départ</button>
+            <button id="btnStop" class="btn-stop" onclick="stopTracking()">Arrêt</button>
+            <button id="btnAddStop" class="btn-stop-btn" onclick="addBusStop()">➕ Arrêt</button>
+            <button id="btnExport" class="btn-export" onclick="exportGPX()">Export</button>
+        </div>
+        <div id="status">Prêt (v2.8.0)</div>
         <div id="map"></div>
+        
+        <button id="btnRecenter" onclick="recenterMap()">🎯 Recentrer</button>
     </div>
 
     <script src="capacitor.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        let positions = []; 
+        let positions = [];
+        let waypoints = []; // Arrêts de bus
         let watchId = null;
-        let map, polyline;
+        let map, polyline, busMarker;
+        let totalDistance = 0; // en km
+        let autoCenter = true;
 
+        // Initialisation de la carte Leaflet
         map = L.map('map', { zoomControl: false, attributionControl: false }).setView([46.6, 1.8], 5);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         polyline = L.polyline([], {color: '#e74c3c', weight: 6}).addTo(map);
 
+        // Détection du déplacement manuel de la carte par le chauffeur
+        map.on('dragstart', () => {
+            autoCenter = false;
+            document.getElementById('btnRecenter').style.display = 'block';
+        });
+
+        function recenterMap() {
+            autoCenter = true;
+            document.getElementById('btnRecenter').style.display = 'none';
+            if (positions.length > 0) {
+                const last = positions[positions.length - 1];
+                map.setView([last.lat, last.lng], 16);
+            }
+        }
+
+        // Formule Haversine pour calculer la distance entre deux coordonnées GPS
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Rayon de la Terre en km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        async function bloquerMiseEnVeille() {
+            try {
+                if (window.Capacitor && Capacitor.Plugins.KeepAwake) {
+                    await Capacitor.Plugins.KeepAwake.keepAwake();
+                }
+            } catch (e) { console.error("Erreur KeepAwake:", e); }
+        }
+
+        async function autoriserMiseEnVeille() {
+            try {
+                if (window.Capacitor && Capacitor.Plugins.KeepAwake) {
+                    await Capacitor.Plugins.KeepAwake.allowSleep();
+                }
+            } catch (e) { console.error("Erreur KeepAwake:", e); }
+        }
+
         async function startTracking() {
             if (watchId) return;
             try {
-                if (window.Capacitor) {
+                if (window.Capacitor && Capacitor.Plugins.Geolocation) {
                     await Capacitor.Plugins.Geolocation.requestPermissions();
                 }
-                document.getElementById('status').innerText = "📍 GPS Actif (v2.7.8)";
-                watchId = await Capacitor.Plugins.Geolocation.watchPosition({ enableHighAccuracy: true }, (pos) => {
-                    if (pos) {
-                        const coords = [pos.coords.latitude, pos.coords.longitude];
-                        positions.push({ lat: pos.coords.latitude, lng: pos.coords.longitude, time: new Date().toISOString() });
-                        polyline.addLatLng(coords);
-                        map.setView(coords, 16);
-                        document.getElementById('status').innerText = `🏃 ${positions.length} pts (v2.7.8)`;
+
+                await bloquerMiseEnVeille();
+                document.getElementById('status').innerText = "📍 GPS Actif - Recherche du signal...";
+                
+                watchId = await Capacitor.Plugins.Geolocation.watchPosition(
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }, 
+                    (pos, err) => {
+                        if (err) return console.error(err);
+                        if (pos && pos.coords) {
+                            const lat = pos.coords.latitude;
+                            const lng = pos.coords.longitude;
+                            const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0; // m/s vers km/h
+                            const accuracy = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : 0;
+
+                            // Mise à jour de la distance
+                            if (positions.length > 0) {
+                                const last = positions[positions.length - 1];
+                                const dist = calculateDistance(last.lat, last.lng, lat, lng);
+                                if (dist > 0.003) { // filtre le bruit GPS de moins de 3 mètres
+                                    totalDistance += dist;
+                                }
+                            }
+
+                            positions.push({ lat, lng, time: new Date().toISOString() });
+                            polyline.addLatLng([lat, lng]);
+
+                            // Curseur sur la carte
+                            if (!busMarker) {
+                                busMarker = L.circleMarker([lat, lng], { radius: 8, fillColor: '#3498db', color: '#ffffff', weight: 2, fillOpacity: 1 }).addTo(map);
+                            } else {
+                                busMarker.setLatLng([lat, lng]);
+                            }
+
+                            if (autoCenter) {
+                                map.setView([lat, lng], 16);
+                            }
+
+                            // Mise à jour du Dashboard
+                            document.getElementById('valSpeed').innerText = `${speed} km/h`;
+                            document.getElementById('valDist').innerText = `${totalDistance.toFixed(2)} km`;
+                            document.getElementById('valAcc').innerText = `±${accuracy} m`;
+                            document.getElementById('status').innerText = `🏃 ${positions.length} pts enregistrés`;
+                        }
                     }
-                });
-            } catch (err) { alert(err.message); }
+                );
+            } catch (err) { 
+                alert("Erreur GPS : " + err.message); 
+            }
         }
 
         async function stopTracking() {
             if (watchId) {
-                await Capacitor.Plugins.Geolocation.clearWatch({ id: watchId });
+                if (window.Capacitor && Capacitor.Plugins.Geolocation) {
+                    await Capacitor.Plugins.Geolocation.clearWatch({ id: watchId });
+                }
                 watchId = null;
-                document.getElementById('status').innerText = "🛑 Stoppé (v2.7.8)";
+                await autoriserMiseEnVeille();
+                document.getElementById('status').innerText = "🛑 Trajet Stoppé";
+            }
+        }
+
+        // Ajouter un point d'arrêt sur le tracé
+        function addBusStop() {
+            if (positions.length === 0) return alert("Démarrez d'abord le suivi GPS.");
+            const lastPos = positions[positions.length - 1];
+            const stopName = prompt("Nom ou numéro de l'arrêt (ex: Arrêt Mairie) :", `Arrêt ${waypoints.length + 1}`);
+            
+            if (stopName) {
+                waypoints.push({ lat: lastPos.lat, lng: lastPos.lng, name: stopName, time: new Date().toISOString() });
+                L.marker([lastPos.lat, lastPos.lng]).addTo(map).bindPopup(`<b>${stopName}</b>`).openPopup();
+                alert(`Arrêt "${stopName}" enregistré !`);
             }
         }
 
         async function exportGPX() {
-            if (positions.length < 2) return alert("Pas assez de points.");
+            if (positions.length < 2) return alert("Pas assez de points enregistrés.");
             
-            let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg>`;
-            positions.forEach(p => gpx += `<trkpt lat="${p.lat}" lon="${p.lng}"><time>${p.time}</time></trkpt>`);
-            gpx += `</trkseg></trk></gpx>`;
+            let gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="BusRouteTracker" xmlns="http://www.topografix.com/GPX/1/1">\n`;
+            
+            // Export des points d'arrêts (Waypoints)
+            waypoints.forEach(wp => {
+                gpx += `  <wpt lat="${wp.lat}" lon="${wp.lng}"><name>${wp.name}</name><time>${wp.time}</time></wpt>\n`;
+            });
+
+            // Export du tracé complet
+            gpx += `  <trk>\n    <name>Tournée de Bus</name>\n    <trkseg>\n`;
+            positions.forEach(p => {
+                gpx += `      <trkpt lat="${p.lat}" lon="${p.lng}"><time>${p.time}</time></trkpt>\n`;
+            });
+            gpx += `    </trkseg>\n  </trk>\n</gpx>`;
 
             try {
-                if (window.Capacitor && Capacitor.Plugins.Share) {
-                    // ASTUCE : On crée un lien de données (Data URI)
-                    // On précise bien le type 'application/gpx+xml'
-                    const base64Data = btoa(unescape(encodeURIComponent(gpx)));
-                    
+                if (window.Capacitor && Capacitor.Plugins.Filesystem && Capacitor.Plugins.Share) {
+                    const fileName = `tournee_bus_${Date.now()}.gpx`;
+                    const savedFile = await Capacitor.Plugins.Filesystem.writeFile({
+                        path: fileName,
+                        data: gpx,
+                        directory: 'CACHE',
+                        encoding: 'utf8'
+                    });
+
                     await Capacitor.Plugins.Share.share({
-                        title: 'Parcours GPS v2.7.8',
-                        url: 'data:application/gpx+xml;base64,' + base64Data,
-                        dialogTitle: 'Enregistrer le fichier GPX'
+                        title: 'Parcours GPX Bus',
+                        url: savedFile.uri,
+                        dialogTitle: 'Enregistrer la tournée'
                     });
                 } else {
-                    // Fallback navigateur PC
                     const blob = new Blob([gpx], { type: 'application/gpx+xml' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = "parcours.gpx";
+                    a.download = `tournee_bus_${new Date().toISOString().slice(0, 10)}.gpx`;
                     a.click();
+                    URL.revokeObjectURL(url);
                 }
-            } catch (err) { alert("Erreur : " + err.message); }
+            } catch (err) { alert("Erreur lors de l'exportation : " + err.message); }
         }
     </script>
 </body>
