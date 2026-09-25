@@ -30,7 +30,7 @@ jobs:
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Configuration de la Version (v2.8.0)
+      - name: Configuration de la Version & Permissions (v2.8.0)
         run: |
           GRADLE="android/app/build.gradle"
           sed -i 's/versionCode [0-9]*/versionCode 30/' $GRADLE
@@ -40,7 +40,6 @@ jobs:
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
-          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />' $MANIFEST
 
       - name: Installation Java
         uses: actions/setup-java@v4
