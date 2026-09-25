@@ -1,4 +1,4 @@
-name: Build Android APK (v2.7.8)
+name: Build Android APK (v2.8.0)
 
 on:
   push:
@@ -30,17 +30,17 @@ jobs:
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Configuration de la Version (v2.7.8)
+      - name: Configuration de la Version (v2.8.0)
         run: |
           GRADLE="android/app/build.gradle"
-          # On définit le versionCode à 28 pour la version 2.7.8
-          sed -i 's/versionCode [0-9]*/versionCode 28/' $GRADLE
-          sed -i 's/versionName "[^"]*"/versionName "2.7.8"/' $GRADLE
+          sed -i 's/versionCode [0-9]*/versionCode 30/' $GRADLE
+          sed -i 's/versionName "[^"]*"/versionName "2.8.0"/' $GRADLE
           
-          # Permissions GPS et Mise en veille
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />' $MANIFEST
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' $MANIFEST
           sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.WAKE_LOCK" />' $MANIFEST
+          sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />' $MANIFEST
 
       - name: Installation Java
         uses: actions/setup-java@v4
@@ -55,15 +55,12 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: MISE À JOUR AUTOMATIQUE DU VERSION.JSON (v2.7.8)
+      - name: MISE À JOUR AUTOMATIQUE DU VERSION.JSON (v2.8.0)
         run: |
-          # On prépare l'APK pour le téléchargement
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
           
-          # On génère le fichier version.json dynamiquement
-          # Le champ "update_id" change à chaque build pour forcer le rafraîchissement du cache
           echo "{" > version.json
-          echo "  \"version\": \"2.7.8\"," >> version.json
+          echo "  \"version\": \"2.8.0\"," >> version.json
           echo "  \"url\": \"https://lorenzmini1-lab.github.io/Traceur-de-Route/app-release.apk\"," >> version.json
           echo "  \"update_id\": \"$(date +%s)\"" >> version.json
           echo "}" >> version.json
