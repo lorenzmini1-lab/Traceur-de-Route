@@ -19,18 +19,19 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Installation des dépendances
+      - name: Nettoyage et Installation des dépendances
         run: |
           mkdir -p www
+          rm -rf node_modules package-lock.json android
+          npm cache clean --force
           npm install --force
 
       - name: Initialisation Capacitor
         run: |
-          rm -rf android
           npx cap init "Traceur de Route" "com.traceur.gps" --web-dir www
           npx cap add android
 
-      - name: Configuration de la Version & Permissions (v2.8.0)
+      - name: Configuration de la Version & Permissions
         run: |
           GRADLE="android/app/build.gradle"
           sed -i 's/versionCode [0-9]*/versionCode 30/' $GRADLE
@@ -54,7 +55,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: MISE À JOUR AUTOMATIQUE DU VERSION.JSON (v2.8.0)
+      - name: Déploiement vers GitHub Pages
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk ./app-release.apk
           
@@ -64,7 +65,7 @@ jobs:
           echo "  \"update_id\": \"$(date +%s)\"" >> version.json
           echo "}" >> version.json
 
-      - name: Déploiement sur GitHub Pages
+      - name: Publication sur GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
