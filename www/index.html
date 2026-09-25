@@ -83,7 +83,7 @@
         // Initialisation Carte
         map = L.map('map', { zoomControl: false, attributionControl: false }).setView([46.6, 1.8], 5);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        polyline = L.polyline([], {color: '#e74c3c', weight: 6}).addTo(map);
+        polyline = L.polyline([], {color: '#e74c3c', weight: 6, smoothFactor: 1}).addTo(map);
 
         map.on('dragstart', () => {
             autoCenter = false;
@@ -95,7 +95,7 @@
             document.getElementById('btnRecenter').style.display = 'none';
             if (positions.length > 0) {
                 const last = positions[positions.length - 1];
-                map.setView([last.lat, last.lng], 16);
+                map.setView([last.lat, last.lng], 17);
             }
         }
 
@@ -121,7 +121,7 @@
                 document.getElementById('status').innerText = "📍 GPS Actif - Recherche du signal...";
                 
                 watchId = await Capacitor.Plugins.Geolocation.watchPosition(
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }, 
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }, 
                     (pos, err) => {
                         if (err) return console.error(err);
                         if (pos && pos.coords) {
@@ -130,11 +130,20 @@
                             const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
                             const accuracy = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : 0;
 
+                            // FILTRE DE PRÉCISION : Ignorer les points trop flous (> 20m)
+                            if (accuracy > 20) {
+                                document.getElementById('status').innerText = `⚠️ Signal faible (±${accuracy}m) - point ignoré`;
+                                return;
+                            }
+
                             if (positions.length > 0) {
                                 const last = positions[positions.length - 1];
                                 const dist = calculateDistance(last.lat, last.lng, lat, lng);
-                                if (dist > 0.003) {
+                                // CAPTURE PLUS FRÉQUENTE : Seuil réduit à 1 mètre (0.001 km)
+                                if (dist > 0.001) {
                                     totalDistance += dist;
+                                } else {
+                                    return; // Véhicule immobile : ne pas ajouter de points inutiles
                                 }
                             }
 
@@ -148,7 +157,7 @@
                             }
 
                             if (autoCenter) {
-                                map.setView([lat, lng], 16);
+                                map.setView([lat, lng], 17);
                             }
 
                             document.getElementById('valSpeed').innerText = `${speed} km/h`;
