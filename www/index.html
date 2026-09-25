@@ -110,72 +110,87 @@
             return R * c;
         }
 
-        async function startTracking() {
-            if (watchId) return;
-            try {
-                if (window.Capacitor && Capacitor.Plugins.Geolocation) {
-                    await Capacitor.Plugins.Geolocation.requestPermissions();
-                }
+        // Traitement d'une nouvelle position GPS
+        function processPosition(pos) {
+            if (!pos || !pos.coords) return;
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+            const accuracy = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : 0;
 
+            // FILTRE DE PRÉCISION : Ignorer les points trop flous (> 20m)
+            if (accuracy > 20) {
+                document.getElementById('status').innerText = `⚠️ Signal faible (±${accuracy}m) - point ignoré`;
+                return;
+            }
+
+            if (positions.length > 0) {
+                const last = positions[positions.length - 1];
+                const dist = calculateDistance(last.lat, last.lng, lat, lng);
+                if (dist > 0.001) {
+                    totalDistance += dist;
+                } else {
+                    return; // Immobile
+                }
+            }
+
+            positions.push({ lat, lng, time: new Date().toISOString() });
+            polyline.addLatLng([lat, lng]);
+
+            if (!busMarker) {
+                busMarker = L.circleMarker([lat, lng], { radius: 8, fillColor: '#3498db', color: '#ffffff', weight: 2, fillOpacity: 1 }).addTo(map);
+            } else {
+                busMarker.setLatLng([lat, lng]);
+            }
+
+            if (autoCenter) {
+                map.setView([lat, lng], 17);
+            }
+
+            document.getElementById('valSpeed').innerText = `${speed} km/h`;
+            document.getElementById('valDist').innerText = `${totalDistance.toFixed(2)} km`;
+            document.getElementById('valAcc').innerText = `±${accuracy} m`;
+            document.getElementById('status').innerText = `🏃 ${positions.length} pts enregistrés`;
+        }
+
+        async function startTracking() {
+            if (watchId !== null) return;
+            try {
                 await bloquerMiseEnVeille();
                 document.getElementById('status').innerText = "📍 GPS Actif - Recherche du signal...";
-                
-                watchId = await Capacitor.Plugins.Geolocation.watchPosition(
-                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }, 
-                    (pos, err) => {
-                        if (err) return console.error(err);
-                        if (pos && pos.coords) {
-                            const lat = pos.coords.latitude;
-                            const lng = pos.coords.longitude;
-                            const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
-                            const accuracy = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : 0;
 
-                            // FILTRE DE PRÉCISION : Ignorer les points trop flous (> 20m)
-                            if (accuracy > 20) {
-                                document.getElementById('status').innerText = `⚠️ Signal faible (±${accuracy}m) - point ignoré`;
-                                return;
-                            }
-
-                            if (positions.length > 0) {
-                                const last = positions[positions.length - 1];
-                                const dist = calculateDistance(last.lat, last.lng, lat, lng);
-                                // CAPTURE PLUS FRÉQUENTE : Seuil réduit à 1 mètre (0.001 km)
-                                if (dist > 0.001) {
-                                    totalDistance += dist;
-                                } else {
-                                    return; // Véhicule immobile : ne pas ajouter de points inutiles
-                                }
-                            }
-
-                            positions.push({ lat, lng, time: new Date().toISOString() });
-                            polyline.addLatLng([lat, lng]);
-
-                            if (!busMarker) {
-                                busMarker = L.circleMarker([lat, lng], { radius: 8, fillColor: '#3498db', color: '#ffffff', weight: 2, fillOpacity: 1 }).addTo(map);
-                            } else {
-                                busMarker.setLatLng([lat, lng]);
-                            }
-
-                            if (autoCenter) {
-                                map.setView([lat, lng], 17);
-                            }
-
-                            document.getElementById('valSpeed').innerText = `${speed} km/h`;
-                            document.getElementById('valDist').innerText = `${totalDistance.toFixed(2)} km`;
-                            document.getElementById('valAcc').innerText = `±${accuracy} m`;
-                            document.getElementById('status').innerText = `🏃 ${positions.length} pts enregistrés`;
+                // Si on est dans l'application Capacitor (APK)
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
+                    await Capacitor.Plugins.Geolocation.requestPermissions();
+                    watchId = await Capacitor.Plugins.Geolocation.watchPosition(
+                        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }, 
+                        (pos, err) => {
+                            if (err) console.error(err);
+                            else processPosition(pos);
                         }
-                    }
-                );
+                    );
+                } 
+                // Si on est sur un navigateur Web classique
+                else if ("geolocation" in navigator) {
+                    watchId = navigator.geolocation.watchPosition(
+                        (pos) => processPosition(pos),
+                        (err) => alert("Erreur GPS Web : " + err.message),
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    );
+                } else {
+                    alert("Géolocalisation non supportée sur ce navigateur.");
+                }
             } catch (err) { 
                 alert("Erreur GPS : " + err.message); 
             }
         }
 
         async function stopTracking() {
-            if (watchId) {
-                if (window.Capacitor && Capacitor.Plugins.Geolocation) {
+            if (watchId !== null) {
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
                     await Capacitor.Plugins.Geolocation.clearWatch({ id: watchId });
+                } else if ("geolocation" in navigator) {
+                    navigator.geolocation.clearWatch(watchId);
                 }
                 watchId = null;
                 await autoriserMiseEnVeille();
@@ -211,7 +226,7 @@
             gpx += `    </trkseg>\n  </trk>\n</gpx>`;
 
             try {
-                if (window.Capacitor && Capacitor.Plugins.Filesystem && Capacitor.Plugins.Share) {
+                if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem && window.Capacitor.Plugins.Share) {
                     const fileName = `tournee_bus_${Date.now()}.gpx`;
                     const savedFile = await Capacitor.Plugins.Filesystem.writeFile({
                         path: fileName,
